@@ -1,0 +1,15 @@
+services:
+
+  nodejs:
+    container_name: loc-nodejs
+    build:
+      context: ./nodejs
+      dockerfile: dockerfile
+    working_dir: /usr/src/app
+    volumes:
+      - ./nodejs:/usr/src/app
+    ports:
+      - "${NODE_PORT}:${NODE_PORT}"
+    env_file:
+      - .env
+    tty: true
