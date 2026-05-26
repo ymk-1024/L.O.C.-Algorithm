@@ -12,5 +12,3 @@ fi
 
 echo ""
 echo "[2/2] 起動成功！"
-echo "コンテナの状態:"
-docker compose ps

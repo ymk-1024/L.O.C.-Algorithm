@@ -13,7 +13,4 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [2/2] 起動成功！
-echo コンテナの状態:
-docker compose ps
-
 pause
