@@ -1,0 +1,36 @@
+CREATE TABLE IF NOT EXISTS `users` (
+  `uuid` VARCHAR(255) NOT NULL PRIMARY KEY,
+  `username` varchar(255) NOT NULL,
+  `password` varchar(255) NULL,
+  `email` varchar(255) NULL,
+  `create_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `update_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+)
+
+CREATE TABLE IF NOT EXISTS `device` (
+    `uuid` VARCHAR(255) NOT NULL PRIMARY KEY,
+    `user_uuid` VARCHAR(255) NOT NULL,
+    `name` VARCHAR(255) NOT NULL,
+    `type` VARCHAR(255) NOT NULL,
+    `status` VARCHAR(255) NOT NULL,
+    `create_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `update_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_uuid) REFERENCES users(uuid)
+)
+
+CREATE TABLE IF NOT EXISTS `sit_data` (
+    `uuid` VARCHAR(255) NOT NULL PRIMARY KEY,
+    `device_uuid` VARCHAR(255) NOT NULL,
+    `start_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `end_at` TIMESTAMP DEFAULT NULL,
+    FOREIGN KEY (device_uuid) REFERENCES device(uuid)
+)
+
+CREATE TABLE IF NOT EXISTS `activity_data` (
+    `uuid` VARCHAR(255) NOT NULL PRIMARY KEY,
+    `device_uuid` VARCHAR(255) NOT NULL,
+    `type` VARCHAR(255) NOT NULL,
+    `create_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (device_uuid) REFERENCES device(uuid)
+)
