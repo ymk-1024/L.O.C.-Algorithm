@@ -1,0 +1,3 @@
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+docker compose up -d --build
