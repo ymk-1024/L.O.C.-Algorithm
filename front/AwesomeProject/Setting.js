@@ -22,10 +22,10 @@ const Stack = createNativeStackNavigator();
 // -------------------------------------------------------------
 const INITIAL_SETTINGS = {
   wifi: {
-    enabled: true,
-    connectedSsid: process.env.EXPO_PUBLIC_DEFAULT_SSID || 'StandUpGuardian_5G',
-    autoConnect: true,
-    preferredSsid: process.env.EXPO_PUBLIC_DEFAULT_SSID || 'StandUpGuardian_5G',
+    enabled: false,
+    connectedSsid: '',
+    autoConnect: false,
+    preferredSsid: '',
     delaySeconds: 5,
   },
   reminderIntervalMinutes: 60,
@@ -278,13 +278,25 @@ function WifiSettingScreen({ navigation }) {
             <View style={tw`bg-white rounded-[20px] p-5 mb-4 shadow-sm`}>
               <View style={tw`flex-row items-center justify-between py-1`}>
                 <View style={tw`flex-row items-center`}>
-                  <Ionicons name="checkmark-circle" size={24} color="#27AE60" />
-                  <View style={{ marginLeft: 10 }}>
-                    <Text style={tw`text-[18px] font-bold text-[#1C1C1E]`}>{settings.wifi.connectedSsid}</Text>
-                    <Text style={tw`text-[12px] text-[#27AE60] font-medium`}>接続済み (5GHz)</Text>
-                  </View>
+                  {settings.wifi.connectedSsid ? (
+                    <>
+                      <Ionicons name="checkmark-circle" size={24} color="#27AE60" />
+                      <View style={{ marginLeft: 10 }}>
+                        <Text style={tw`text-[18px] font-bold text-[#1C1C1E]`}>{settings.wifi.connectedSsid}</Text>
+                        <Text style={tw`text-[12px] text-[#27AE60] font-medium`}>接続済み (5GHz)</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="warning-outline" size={24} color="#8E8E93" />
+                      <View style={{ marginLeft: 10 }}>
+                        <Text style={tw`text-[18px] font-bold text-[#8E8E93]`}>未接続</Text>
+                        <Text style={tw`text-[12px] text-[#8E8E93] font-medium`}>ネットワークを選択してください</Text>
+                      </View>
+                    </>
+                  )}
                 </View>
-                <Ionicons name="wifi" size={20} color="#1E3D37" />
+                <Ionicons name="wifi" size={20} color={settings.wifi.connectedSsid ? '#1E3D37' : '#8E8E93'} />
               </View>
             </View>
 
