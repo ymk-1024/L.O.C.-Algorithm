@@ -12,6 +12,8 @@ services:
       - "${NODE_PORT}:${NODE_PORT}"
     env_file:
       - .env
+    environment:
+      MYSQL_PORT: 3306
     depends_on:
       - mysql
     tty: true

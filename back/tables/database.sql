@@ -33,3 +33,11 @@ CREATE TABLE IF NOT EXISTS `activity_data` (
     `create_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (device_uuid) REFERENCES device(uuid)
 );
+
+INSERT INTO `users` (`uuid`, `username`, `email`, `password`) 
+VALUES (
+    'user-uuid-1111-2222-3333', 
+    'test_user', 
+    'test@example.com', 
+    'hashed_password_123'
+);
