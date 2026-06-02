@@ -23,20 +23,20 @@ const Stack = createNativeStackNavigator();
 const INITIAL_SETTINGS = {
   wifi: {
     enabled: true,
-    connectedSsid: 'StandUpGuardian_5G',
+    connectedSsid: process.env.EXPO_PUBLIC_DEFAULT_SSID || 'StandUpGuardian_5G',
     autoConnect: true,
-    preferredSsid: 'StandUpGuardian_5G',
+    preferredSsid: process.env.EXPO_PUBLIC_DEFAULT_SSID || 'StandUpGuardian_5G',
     delaySeconds: 5,
   },
   reminderIntervalMinutes: 60,
   dailyStandGoal: 8,
   sensorSensitivity: 'Medium', // 'Low' | 'Medium' | 'High'
   device: {
-    name: 'SG-Sensor-X1',
+    name: process.env.EXPO_PUBLIC_DEFAULT_DEVICE_NAME || 'SG-Sensor-X1',
     status: 'Connected',
     batteryLevel: 82,
     serialNumber: 'SN-98231B-G',
-    firmwareVersion: 'v1.2.4',
+    firmwareVersion: 'v' + (process.env.EXPO_PUBLIC_APP_VERSION || '1.2.4'),
   },
   notifications: {
     enabled: true,
@@ -57,7 +57,8 @@ export function SettingsProvider({ children }) {
   // Future implementation: Fetch settings from API on mount
   const fetchSettingsFromApi = async () => {
     try {
-      // const response = await fetch('https://api.standupguardian.com/settings');
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://api.standupguardian.com';
+      // const response = await fetch(`${apiUrl}/settings`);
       // const data = await response.json();
       // setSettings(data);
     } catch (error) {
@@ -68,7 +69,8 @@ export function SettingsProvider({ children }) {
   // Future implementation: Push changes to API
   const saveSettingsToApi = async (updatedSettings) => {
     try {
-      // await fetch('https://api.standupguardian.com/settings', {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://api.standupguardian.com';
+      // await fetch(`${apiUrl}/settings`, {
       //   method: 'PUT',
       //   body: JSON.stringify(updatedSettings),
       //   headers: { 'Content-Type': 'application/json' }
