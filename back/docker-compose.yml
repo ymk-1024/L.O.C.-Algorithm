@@ -12,7 +12,10 @@ services:
       - "${NODE_PORT}:${NODE_PORT}"
     env_file:
       - .env
+    depends_on:
+      - mysql
     tty: true
+    command: npm run dev
 
   mysql:
     container_name: loc-mysql
@@ -27,6 +30,7 @@ services:
       - "${MYSQL_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./tables/database.sql:/docker-entrypoint-initdb.d/init.sql
 
 volumes:       
   mysql_data:
