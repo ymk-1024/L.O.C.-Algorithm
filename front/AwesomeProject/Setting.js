@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Text,
   View,
@@ -18,9 +18,109 @@ import tw from 'twrnc';
 const Stack = createNativeStackNavigator();
 
 // -------------------------------------------------------------
+// Centralized Settings Data Structure (Easy to map with API)
+// -------------------------------------------------------------
+const INITIAL_SETTINGS = {
+  wifi: {
+    enabled: true,
+    connectedSsid: 'StandUpGuardian_5G',
+    autoConnect: true,
+    preferredSsid: 'StandUpGuardian_5G',
+    delaySeconds: 5,
+  },
+  reminderIntervalMinutes: 60,
+  dailyStandGoal: 8,
+  sensorSensitivity: 'Medium', // 'Low' | 'Medium' | 'High'
+  device: {
+    name: 'SG-Sensor-X1',
+    status: 'Connected',
+    batteryLevel: 82,
+    serialNumber: 'SN-98231B-G',
+    firmwareVersion: 'v1.2.4',
+  },
+  notifications: {
+    enabled: true,
+    soundEnabled: true,
+    vibrationEnabled: true,
+    soundName: 'Chime',
+    dndEnabled: false,
+  },
+  language: 'ja', // 'ja' | 'en' | 'zh' | 'ko'
+};
+
+const SettingsContext = createContext(null);
+
+export function SettingsProvider({ children }) {
+  const [settings, setSettings] = useState(INITIAL_SETTINGS);
+
+  // Mock API Operations
+  // Future implementation: Fetch settings from API on mount
+  const fetchSettingsFromApi = async () => {
+    try {
+      // const response = await fetch('https://api.standupguardian.com/settings');
+      // const data = await response.json();
+      // setSettings(data);
+    } catch (error) {
+      console.log('API Fetch Error:', error);
+    }
+  };
+
+  // Future implementation: Push changes to API
+  const saveSettingsToApi = async (updatedSettings) => {
+    try {
+      // await fetch('https://api.standupguardian.com/settings', {
+      //   method: 'PUT',
+      //   body: JSON.stringify(updatedSettings),
+      //   headers: { 'Content-Type': 'application/json' }
+      // });
+    } catch (error) {
+      console.log('API Save Error:', error);
+    }
+  };
+
+  const updateSetting = (path, value) => {
+    setSettings((prev) => {
+      const newSettings = JSON.parse(JSON.stringify(prev)); // Deep copy helper
+      
+      // Traverse to nested field
+      let current = newSettings;
+      for (let i = 0; i < path.length - 1; i++) {
+        current = current[path[i]];
+      }
+      current[path[path.length - 1]] = value;
+
+      // Save changes to API in background
+      saveSettingsToApi(newSettings);
+
+      return newSettings;
+    });
+  };
+
+  useEffect(() => {
+    fetchSettingsFromApi();
+  }, []);
+
+  return (
+    <SettingsContext.Provider value={{ settings, updateSetting }}>
+      {children}
+    </SettingsContext.Provider>
+  );
+}
+
+export function useSettings() {
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error('useSettings must be used within a SettingsProvider');
+  }
+  return context;
+}
+
+// -------------------------------------------------------------
 // Setting Main Screen (List of settings)
 // -------------------------------------------------------------
 function SettingMainScreen({ navigation }) {
+  const { settings } = useSettings();
+
   return (
     <SafeAreaView style={tw`flex-1 bg-[#F7F9FB]`}>
       <View style={tw`px-6 pb-3 bg-[#F7F9FB] ${Platform.OS === 'android' ? 'pt-4' : 'pt-3'}`}>
@@ -49,7 +149,9 @@ function SettingMainScreen({ navigation }) {
           >
             <View style={tw`flex-row items-center`}>
               <Ionicons name="wifi" size={24} color="#000000" />
-              <Text style={tw`text-[20px] font-bold text-black ml-3`}>Wi-Fi設定</Text>
+              <Text style={tw`text-[20px] font-bold text-black ml-3`}>
+                Wi-Fi設定
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#000000" />
           </TouchableOpacity>
@@ -119,13 +221,7 @@ function DetailHeader({ title, onBack }) {
 // 1. Wifi Setting Screen (with integrated Auto Connect settings)
 // -------------------------------------------------------------
 function WifiSettingScreen({ navigation }) {
-  const [wifiEnabled, setWifiEnabled] = useState(true);
-  const [connectedSsid, setConnectedSsid] = useState('StandUpGuardian_5G');
-
-  // Integrated Auto-connect states
-  const [autoEnabled, setAutoEnabled] = useState(true);
-  const [selectedNetwork, setSelectedNetwork] = useState('StandUpGuardian_5G');
-  const [delay, setDelay] = useState(5);
+  const { settings, updateSetting } = useSettings();
 
   const availableNetworks = [
     { ssid: 'Office-Guest-Wi-Fi', secure: true, signal: 3 },
@@ -147,7 +243,7 @@ function WifiSettingScreen({ navigation }) {
       {
         text: '接続',
         onPress: () => {
-          setConnectedSsid(ssid);
+          updateSetting(['wifi', 'connectedSsid'], ssid);
         },
       },
     ]);
@@ -165,15 +261,15 @@ function WifiSettingScreen({ navigation }) {
               <Text style={tw`text-[13px] text-[#8E8E93] mt-1 max-w-[80%]`}>周辺のネットワークを検索します</Text>
             </View>
             <Switch
-              value={wifiEnabled}
-              onValueChange={setWifiEnabled}
+              value={settings.wifi.enabled}
+              onValueChange={(val) => updateSetting(['wifi', 'enabled'], val)}
               trackColor={{ false: '#D1D1D6', true: '#EAF6F3' }}
-              thumbColor={wifiEnabled ? '#1E3D37' : '#FFFFFF'}
+              thumbColor={settings.wifi.enabled ? '#1E3D37' : '#FFFFFF'}
             />
           </View>
         </View>
 
-        {wifiEnabled && (
+        {settings.wifi.enabled && (
           <View style={tw`mt-2`}>
             {/* Connection Status Card */}
             <Text style={tw`text-[16px] font-bold text-[#7E8B93] mb-2 ml-2`}>接続中のネットワーク</Text>
@@ -182,7 +278,7 @@ function WifiSettingScreen({ navigation }) {
                 <View style={tw`flex-row items-center`}>
                   <Ionicons name="checkmark-circle" size={24} color="#27AE60" />
                   <View style={{ marginLeft: 10 }}>
-                    <Text style={tw`text-[18px] font-bold text-[#1C1C1E]`}>{connectedSsid}</Text>
+                    <Text style={tw`text-[18px] font-bold text-[#1C1C1E]`}>{settings.wifi.connectedSsid}</Text>
                     <Text style={tw`text-[12px] text-[#27AE60] font-medium`}>接続済み (5GHz)</Text>
                   </View>
                 </View>
@@ -217,7 +313,7 @@ function WifiSettingScreen({ navigation }) {
               })}
             </View>
 
-            {/* Integrated Auto-Connect Settings Card (Accessory Configuration at the bottom) */}
+            {/* Integrated Auto-Connect Settings Card */}
             <Text style={tw`text-[16px] font-bold text-[#7E8B93] mb-2 ml-2`}>自動接続設定 (オプション)</Text>
             <View style={tw`bg-white rounded-[20px] p-5 mb-4 shadow-sm`}>
               <View style={tw`flex-row items-center justify-between py-1`}>
@@ -228,14 +324,14 @@ function WifiSettingScreen({ navigation }) {
                   </Text>
                 </View>
                 <Switch
-                  value={autoEnabled}
-                  onValueChange={setAutoEnabled}
+                  value={settings.wifi.autoConnect}
+                  onValueChange={(val) => updateSetting(['wifi', 'autoConnect'], val)}
                   trackColor={{ false: '#D1D1D6', true: '#EAF6F3' }}
-                  thumbColor={autoEnabled ? '#1E3D37' : '#FFFFFF'}
+                  thumbColor={settings.wifi.autoConnect ? '#1E3D37' : '#FFFFFF'}
                 />
               </View>
 
-              {autoEnabled && (
+              {settings.wifi.autoConnect && (
                 <View style={tw`mt-4 pt-4 border-t border-[#F2F2F7]`}>
                   {/* Preferred Network Selector */}
                   <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-3`}>最優先接続ネットワーク</Text>
@@ -245,10 +341,10 @@ function WifiSettingScreen({ navigation }) {
                       <TouchableOpacity
                         key={net}
                         style={tw`flex-row items-center justify-between py-3 ${!isLast ? 'border-b border-[#F2F2F7]' : ''}`}
-                        onPress={() => setSelectedNetwork(net)}
+                        onPress={() => updateSetting(['wifi', 'preferredSsid'], net)}
                       >
                         <Text style={tw`text-[16px] text-[#1C1C1E]`}>{net}</Text>
-                        {selectedNetwork === net && (
+                        {settings.wifi.preferredSsid === net && (
                           <Ionicons name="checkmark" size={18} color="#1E3D37" />
                         )}
                       </TouchableOpacity>
@@ -261,10 +357,10 @@ function WifiSettingScreen({ navigation }) {
                     {delays.map((d) => (
                       <TouchableOpacity
                         key={d.value}
-                        style={tw`py-2 px-3 rounded-[10px] min-w-[55px] items-center ${delay === d.value ? 'bg-[#EAF6F3]' : 'bg-[#F2F2F7]'}`}
-                        onPress={() => setDelay(d.value)}
+                        style={tw`py-2 px-3 rounded-[10px] min-w-[55px] items-center ${settings.wifi.delaySeconds === d.value ? 'bg-[#EAF6F3]' : 'bg-[#F2F2F7]'}`}
+                        onPress={() => updateSetting(['wifi', 'delaySeconds'], d.value)}
                       >
-                        <Text style={tw`text-[13px] font-medium ${delay === d.value ? 'text-[#1E3D37] font-bold' : 'text-[#8E8E93]'}`}>
+                        <Text style={tw`text-[13px] font-medium ${settings.wifi.delaySeconds === d.value ? 'text-[#1E3D37] font-bold' : 'text-[#8E8E93]'}`}>
                           {d.label}
                         </Text>
                       </TouchableOpacity>
@@ -284,9 +380,7 @@ function WifiSettingScreen({ navigation }) {
 // 3. Details (Advanced) Screen
 // -------------------------------------------------------------
 function DetailsScreen({ navigation }) {
-  const [interval, setInterval] = useState(60);
-  const [goal, setGoal] = useState(8);
-  const [sensitivity, setSensitivity] = useState('Medium');
+  const { settings, updateSetting } = useSettings();
 
   return (
     <SafeAreaView style={tw`flex-1 bg-[#F7F9FB]`}>
@@ -298,24 +392,24 @@ function DetailsScreen({ navigation }) {
           <View style={tw`flex-row items-center justify-between py-[10px]`}>
             <TouchableOpacity
               style={tw`w-12 h-12 rounded-full bg-[#F2F2F7] items-center justify-center`}
-              onPress={() => setInterval(Math.max(15, interval - 15))}
+              onPress={() => updateSetting(['reminderIntervalMinutes'], Math.max(15, settings.reminderIntervalMinutes - 15))}
             >
               <Ionicons name="remove" size={24} color="#1E3D37" />
             </TouchableOpacity>
             <View style={tw`flex-row items-baseline`}>
-              <Text style={tw`text-[32px] font-bold text-[#1E3D37]`}>{interval}</Text>
+              <Text style={tw`text-[32px] font-bold text-[#1E3D37]`}>{settings.reminderIntervalMinutes}</Text>
               <Text style={tw`text-[16px] font-semibold text-[#7E8B93] ml-[6px]`}>分</Text>
             </View>
             <TouchableOpacity
               style={tw`w-12 h-12 rounded-full bg-[#F2F2F7] items-center justify-center`}
-              onPress={() => setInterval(Math.min(180, interval + 15))}
+              onPress={() => updateSetting(['reminderIntervalMinutes'], Math.min(180, settings.reminderIntervalMinutes + 15))}
             >
               <Ionicons name="add" size={24} color="#1E3D37" />
             </TouchableOpacity>
           </View>
           {/* Custom Visual Bar */}
           <View style={tw`h-[6px] bg-[#F2F2F7] rounded-[3px] overflow-hidden mt-4`}>
-            <View style={[tw`h-full bg-[#1E3D37] rounded-[3px]`, { width: `${(interval / 180) * 100}%` }]} />
+            <View style={[tw`h-full bg-[#1E3D37] rounded-[3px]`, { width: `${(settings.reminderIntervalMinutes / 180) * 100}%` }]} />
           </View>
           <Text style={tw`text-[13px] text-[#8E8E93] mt-3 text-center`}>推奨：60分間隔で起立して身体をリフレッシュ</Text>
         </View>
@@ -326,17 +420,17 @@ function DetailsScreen({ navigation }) {
           <View style={tw`flex-row items-center justify-between py-[10px]`}>
             <TouchableOpacity
               style={tw`w-12 h-12 rounded-full bg-[#F2F2F7] items-center justify-center`}
-              onPress={() => setGoal(Math.max(1, goal - 1))}
+              onPress={() => updateSetting(['dailyStandGoal'], Math.max(1, settings.dailyStandGoal - 1))}
             >
               <Ionicons name="remove" size={24} color="#1E3D37" />
             </TouchableOpacity>
             <View style={tw`flex-row items-baseline`}>
-              <Text style={tw`text-[32px] font-bold text-[#1E3D37]`}>{goal}</Text>
+              <Text style={tw`text-[32px] font-bold text-[#1E3D37]`}>{settings.dailyStandGoal}</Text>
               <Text style={tw`text-[16px] font-semibold text-[#7E8B93] ml-[6px]`}>回 / 日</Text>
             </View>
             <TouchableOpacity
               style={tw`w-12 h-12 rounded-full bg-[#F2F2F7] items-center justify-center`}
-              onPress={() => setGoal(Math.min(24, goal + 1))}
+              onPress={() => updateSetting(['dailyStandGoal'], Math.min(24, settings.dailyStandGoal + 1))}
             >
               <Ionicons name="add" size={24} color="#1E3D37" />
             </TouchableOpacity>
@@ -349,12 +443,12 @@ function DetailsScreen({ navigation }) {
           <View style={tw`flex-row justify-between py-1`}>
             {['Low', 'Medium', 'High'].map((level) => {
               const labelMap = { Low: '低', Medium: '中', High: '高' };
-              const isActive = sensitivity === level;
+              const isActive = settings.sensorSensitivity === level;
               return (
                 <TouchableOpacity
                   key={level}
                   style={tw`flex-1 py-3 rounded-[12px] items-center mx-1 ${isActive ? 'bg-[#EAF6F3] border border-[#1E3D37]' : 'bg-[#F2F2F7]'}`}
-                  onPress={() => setSensitivity(level)}
+                  onPress={() => updateSetting(['sensorSensitivity'], level)}
                 >
                   <Text style={tw`text-[15px] ${isActive ? 'text-[#1E3D37] font-bold' : 'text-[#8E8E93] font-medium'}`}>
                     {labelMap[level]}
@@ -373,20 +467,21 @@ function DetailsScreen({ navigation }) {
 // 4. Device Management Screen
 // -------------------------------------------------------------
 function DeviceMgmtScreen({ navigation }) {
+  const { settings } = useSettings();
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const handleUpdate = () => {
     setCheckingUpdate(true);
     setTimeout(() => {
       setCheckingUpdate(false);
-      Alert.alert('アップデート確認', '最新のファームウェア (v1.2.4) が適用されています。');
+      Alert.alert('アップデート確認', `最新のファームウェア (${settings.device.firmwareVersion}) が適用されています。`);
     }, 1500);
   };
 
   const handleUnpair = () => {
     Alert.alert(
       'デバイスのペアリング解除',
-      '現在接続されているセンサー「SG-Sensor-X1」の接続を解除しますか？',
+      `現在接続されているセンサー「${settings.device.name}」の接続を解除しますか？`,
       [
         { text: 'キャンセル', style: 'cancel' },
         { text: '解除する', style: 'destructive', onPress: () => {} },
@@ -402,8 +497,8 @@ function DeviceMgmtScreen({ navigation }) {
           <View style={tw`flex-row items-center pb-1`}>
             <Ionicons name="hardware-chip-outline" size={40} color="#1E3D37" />
             <View style={{ marginLeft: 16 }}>
-              <Text style={tw`text-[20px] font-bold text-[#1C1C1E]`}>SG-Sensor-X1</Text>
-              <Text style={tw`text-[14px] text-[#27AE60] font-semibold mt-[2px]`}>接続中</Text>
+              <Text style={tw`text-[20px] font-bold text-[#1C1C1E]`}>{settings.device.name}</Text>
+              <Text style={tw`text-[14px] text-[#27AE60] font-semibold mt-[2px]`}>{settings.device.status}</Text>
             </View>
           </View>
 
@@ -413,18 +508,18 @@ function DeviceMgmtScreen({ navigation }) {
             <Text style={tw`text-[15px] text-[#8E8E93]`}>バッテリー残量</Text>
             <View style={tw`flex-row items-center`}>
               <Ionicons name="battery-full" size={20} color="#27AE60" />
-              <Text style={tw`text-[15px] text-[#27AE60] font-bold ml-1`}>82%</Text>
+              <Text style={tw`text-[15px] text-[#27AE60] font-bold ml-1`}>{settings.device.batteryLevel}%</Text>
             </View>
           </View>
 
           <View style={tw`flex-row justify-between py-3`}>
             <Text style={tw`text-[15px] text-[#8E8E93]`}>シリアル番号</Text>
-            <Text style={tw`text-[15px] text-[#1C1C1E] font-medium`}>SN-98231B-G</Text>
+            <Text style={tw`text-[15px] text-[#1C1C1E] font-medium`}>{settings.device.serialNumber}</Text>
           </View>
 
           <View style={tw`flex-row justify-between py-3`}>
             <Text style={tw`text-[15px] text-[#8E8E93]`}>ファームウェアバージョン</Text>
-            <Text style={tw`text-[15px] text-[#1C1C1E] font-medium`}>v1.2.4 (最新)</Text>
+            <Text style={tw`text-[15px] text-[#1C1C1E] font-medium`}>{settings.device.firmwareVersion} (最新)</Text>
           </View>
         </View>
 
@@ -450,11 +545,7 @@ function DeviceMgmtScreen({ navigation }) {
 // 5. Notifications Customization Screen
 // -------------------------------------------------------------
 function NotificationsScreen({ navigation }) {
-  const [notify, setNotify] = useState(true);
-  const [sound, setSound] = useState(true);
-  const [vibrate, setVibrate] = useState(true);
-  const [soundName, setSoundName] = useState('Chime');
-  const [dnd, setDnd] = useState(false);
+  const { settings, updateSetting } = useSettings();
 
   const sounds = [
     { id: 'Default', label: 'デフォルト' },
@@ -474,39 +565,39 @@ function NotificationsScreen({ navigation }) {
               <Text style={tw`text-[13px] text-[#8E8E93] mt-1 max-w-[80%]`}>起立のタイミングでお知らせします</Text>
             </View>
             <Switch
-              value={notify}
-              onValueChange={setNotify}
+              value={settings.notifications.enabled}
+              onValueChange={(val) => updateSetting(['notifications', 'enabled'], val)}
               trackColor={{ false: '#D1D1D6', true: '#EAF6F3' }}
-              thumbColor={notify ? '#1E3D37' : '#FFFFFF'}
+              thumbColor={settings.notifications.enabled ? '#1E3D37' : '#FFFFFF'}
             />
           </View>
         </View>
 
-        {notify && (
+        {settings.notifications.enabled && (
           <View style={tw`mt-2`}>
             <Text style={tw`text-[16px] font-bold text-[#7E8B93] mb-2 ml-2`}>通知方法</Text>
             <View style={tw`bg-white rounded-[20px] p-5 mb-4 shadow-sm`}>
               <View style={tw`flex-row items-center justify-between py-1`}>
                 <Text style={tw`text-[18px] font-semibold text-[#1C1C1E]`}>音声通知</Text>
                 <Switch
-                  value={sound}
-                  onValueChange={setSound}
+                  value={settings.notifications.soundEnabled}
+                  onValueChange={(val) => updateSetting(['notifications', 'soundEnabled'], val)}
                   trackColor={{ false: '#D1D1D6', true: '#EAF6F3' }}
-                  thumbColor={sound ? '#1E3D37' : '#FFFFFF'}
+                  thumbColor={settings.notifications.soundEnabled ? '#1E3D37' : '#FFFFFF'}
                 />
               </View>
               <View style={tw`flex-row items-center justify-between py-1`}>
                 <Text style={tw`text-[18px] font-semibold text-[#1C1C1E]`}>バイブレーション</Text>
                 <Switch
-                  value={vibrate}
-                  onValueChange={setVibrate}
+                  value={settings.notifications.vibrationEnabled}
+                  onValueChange={(val) => updateSetting(['notifications', 'vibrationEnabled'], val)}
                   trackColor={{ false: '#D1D1D6', true: '#EAF6F3' }}
-                  thumbColor={vibrate ? '#1E3D37' : '#FFFFFF'}
+                  thumbColor={settings.notifications.vibrationEnabled ? '#1E3D37' : '#FFFFFF'}
                 />
               </View>
             </View>
 
-            {sound && (
+            {settings.notifications.soundEnabled && (
               <>
                 <Text style={tw`text-[16px] font-bold text-[#7E8B93] mb-2 ml-2`}>通知音の選択</Text>
                 <View style={tw`bg-white rounded-[20px] p-5 mb-4 shadow-sm`}>
@@ -516,10 +607,10 @@ function NotificationsScreen({ navigation }) {
                       <TouchableOpacity
                         key={s.id}
                         style={tw`flex-row items-center justify-between py-[18px] ${!isLast ? 'border-b border-[#EAEAEA]' : ''}`}
-                        onPress={() => setSoundName(s.id)}
+                        onPress={() => updateSetting(['notifications', 'soundName'], s.id)}
                       >
                         <Text style={tw`text-[18px] text-[#1C1C1E] ml-[10px]`}>{s.label}</Text>
-                        {soundName === s.id && (
+                        {settings.notifications.soundName === s.id && (
                           <Ionicons name="checkmark" size={20} color="#1E3D37" />
                         )}
                       </TouchableOpacity>
@@ -537,10 +628,10 @@ function NotificationsScreen({ navigation }) {
                   <Text style={tw`text-[13px] text-[#8E8E93] mt-1 max-w-[80%]`}>22:00 〜 翌07:00 の通知をミュートします</Text>
                 </View>
                 <Switch
-                  value={dnd}
-                  onValueChange={setDnd}
+                  value={settings.notifications.dndEnabled}
+                  onValueChange={(val) => updateSetting(['notifications', 'dndEnabled'], val)}
                   trackColor={{ false: '#D1D1D6', true: '#EAF6F3' }}
-                  thumbColor={dnd ? '#1E3D37' : '#FFFFFF'}
+                  thumbColor={settings.notifications.dndEnabled ? '#1E3D37' : '#FFFFFF'}
                 />
               </View>
             </View>
@@ -555,7 +646,7 @@ function NotificationsScreen({ navigation }) {
 // 6. Language Screen
 // -------------------------------------------------------------
 function LanguageScreen({ navigation }) {
-  const [lang, setLang] = useState('ja');
+  const { settings, updateSetting } = useSettings();
 
   const languages = [
     { code: 'ja', name: '日本語' },
@@ -575,10 +666,10 @@ function LanguageScreen({ navigation }) {
               <TouchableOpacity
                 key={l.code}
                 style={tw`flex-row items-center justify-between py-[18px] ${!isLast ? 'border-b border-[#EAEAEA]' : ''}`}
-                onPress={() => setLang(l.code)}
+                onPress={() => updateSetting(['language'], l.code)}
               >
                 <Text style={tw`text-[18px] text-[#1C1C1E] ml-[10px]`}>{l.name}</Text>
-                {lang === l.code && <Ionicons name="checkmark" size={22} color="#1E3D37" />}
+                {settings.language === l.code && <Ionicons name="checkmark" size={22} color="#1E3D37" />}
               </TouchableOpacity>
             );
           })}
@@ -589,24 +680,26 @@ function LanguageScreen({ navigation }) {
 }
 
 // -------------------------------------------------------------
-// Export Stack Navigation Component
+// Export Stack Navigator with Settings Provider
 // -------------------------------------------------------------
 export default function Setting() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}
-      >
-        <Stack.Screen name="SettingMain" component={SettingMainScreen} />
-        <Stack.Screen name="WifiSetting" component={WifiSettingScreen} />
-        <Stack.Screen name="Details" component={DetailsScreen} />
-        <Stack.Screen name="DeviceMgmt" component={DeviceMgmtScreen} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="Language" component={LanguageScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SettingsProvider>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        >
+          <Stack.Screen name="SettingMain" component={SettingMainScreen} />
+          <Stack.Screen name="WifiSetting" component={WifiSettingScreen} />
+          <Stack.Screen name="Details" component={DetailsScreen} />
+          <Stack.Screen name="DeviceMgmt" component={DeviceMgmtScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="Language" component={LanguageScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SettingsProvider>
   );
 }
