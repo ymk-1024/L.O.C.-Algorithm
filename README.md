@@ -17,6 +17,9 @@ cd AwesomeProject
 # 4. 開発サーバーの起動
 npm start
 
+# 5. 必要なライブラリのインストール
+npx expo install @react-navigation/native @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context
+
 ```
 
 ```
