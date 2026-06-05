@@ -1,0 +1,81 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import tw from 'twrnc';
+
+export default function BottomMenuBar({ activeTab, navigation }) {
+  // Menu items structure with Home in the center
+  const items = [
+    { id: 'Records', label: '記録', icon: 'stats-chart', iconOutline: 'stats-chart-outline' },
+    { id: 'Schedule', label: 'スケジュール', icon: 'calendar', iconOutline: 'calendar-outline' },
+    { id: 'Home', label: 'ホーム', icon: 'home', iconOutline: 'home-outline', isCenter: true },
+    { id: 'Account', label: 'アカウント', icon: 'person', iconOutline: 'person-outline' },
+    { id: 'Settings', label: '設定', icon: 'settings', iconOutline: 'settings-outline' },
+  ];
+
+  const handlePress = (id) => {
+    if (id === 'Settings') {
+      navigation.navigate('SettingMain');
+    } else {
+      const labelMap = {
+        Records: '記録',
+        Schedule: 'スケジュール',
+        Home: 'ホーム',
+        Account: 'アカウント',
+      };
+      Alert.alert('準備中', `「${labelMap[id]}」画面は現在開発中です。`);
+    }
+  };
+
+  return (
+    <View style={tw`relative bg-white border-t border-[#EAEAEA] pb-5 pt-2 flex-row justify-around items-center shadow-lg`}>
+      {items.map((item) => {
+        const isActive = activeTab === item.id;
+        const iconName = isActive ? item.icon : item.iconOutline;
+
+        if (item.isCenter) {
+          // Special floating-like circle button design for Home in the center
+          return (
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                tw`items-center justify-center rounded-full bg-[#1E3D37] shadow-lg z-10`,
+                {
+                  width: 60,
+                  height: 60,
+                  marginTop: -30, // Floats slightly above the bar
+                  borderWidth: 4,
+                  borderColor: '#FFFFFF',
+                }
+              ]}
+              activeOpacity={0.85}
+              onPress={() => handlePress(item.id)}
+            >
+              <Ionicons name="home" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          );
+        }
+
+        return (
+          <TouchableOpacity
+            key={item.id}
+            style={tw`items-center justify-center flex-1 py-1`}
+            activeOpacity={0.7}
+            onPress={() => handlePress(item.id)}
+          >
+            <Ionicons 
+              name={iconName} 
+              size={22} 
+              color={isActive ? '#1E3D37' : '#7E8B93'} 
+            />
+            <Text 
+              style={tw`text-[10px] font-bold mt-1 ${isActive ? 'text-[#1E3D37]' : 'text-[#7E8B93]'}`}
+            >
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}

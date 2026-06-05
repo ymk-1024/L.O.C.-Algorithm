@@ -3,25 +3,17 @@ import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform } from
 import { Ionicons } from '@expo/vector-icons';
 import tw from 'twrnc';
 import { useSettings } from './SettingsContext';
+import AppHeader from './AppHeader';
+import BottomMenuBar from './BottomMenuBar';
 
 export default function SettingMainScreen({ navigation }) {
   const { settings } = useSettings();
 
   return (
     <SafeAreaView style={tw`flex-1 bg-[#F7F9FB]`}>
-      <View style={tw`px-6 pb-3 bg-[#F7F9FB] ${Platform.OS === 'android' ? 'pt-4' : 'pt-3'}`}>
-        <View style={tw`flex-row items-center`}>
-          <View style={tw`relative justify-center items-center mr-[10px]`}>
-            <Ionicons name="shield" size={36} color="#7E8B93" />
-            <View style={tw`absolute top-0 left-0 right-0 bottom-0 justify-center items-center pb-[2px]`}>
-              <Text style={tw`text-white text-[11px] font-bold`}>SG</Text>
-            </View>
-          </View>
-          <Text style={tw`text-[26px] font-bold text-black tracking-tighter`}>StandUpGuardian</Text>
-        </View>
-      </View>
+      <AppHeader />
 
-      <ScrollView contentContainerStyle={tw`px-5 pb-10`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`px-5 pb-24`} showsVerticalScrollIndicator={false}>
         <View style={tw`bg-white rounded-[24px] p-4 mt-[10px] shadow-sm`}>
           <View style={tw`bg-[#EAF6F3] rounded-[16px] py-[14px] px-5 mb-4`}>
             <Text style={tw`text-[28px] font-bold text-[#1E3D37]`}>設定</Text>
@@ -80,6 +72,9 @@ export default function SettingMainScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Positioned bottom menu bar */}
+      <BottomMenuBar activeTab="Settings" navigation={navigation} />
     </SafeAreaView>
   );
 }
