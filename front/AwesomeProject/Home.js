@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, Switch, TouchableOpacity, Dimensions } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { Ionicons } from '@expo/vector-icons'; 
-
+import AppHeader from './AppHeader';
+import BottomMenuBar from './BottomMenuBar';
 
 const { width } = Dimensions.get('window');
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const [isEnabled, setIsEnabled] = useState(true);
   const toggleSwitch = () => setIsEnabled(previousState => !previousState);
 
@@ -21,16 +22,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screenContainer}>
-      {/* ヘッダーエリア */}
-      <View style={styles.header}>
-        <View style={styles.logoAndTitle}>
-          {/* 画像に描かれている「SG」の盾型ロゴマーク */}
-          <View style={styles.shieldLogo}>
-            <Text style={styles.shieldText}>SG</Text>
-          </View>
-          <Text style={styles.headerTitle}>StandUpGuardian</Text>
-        </View>
-      </View>
+      <AppHeader />
 
       {/* メインのコンテナカード */}
       <View style={styles.card}>
@@ -80,15 +72,7 @@ export default function HomeScreen() {
         </View>
 
         {/* 下部アクションエリア */}
-        <View style={styles.footerRow}>
-          <TouchableOpacity style={styles.settingsButton} activeOpacity={0.7}>
-            <Ionicons name="settings-outline" size={26} color="#718096" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity activeOpacity={0.7}>
-            <Text style={styles.detailLink}>詳細データを見る</Text>
-          </TouchableOpacity>
-        </View>
+        <BottomMenuBar activeTab="Home" navigation={navigation}/>
 
       </View>
     </View>
