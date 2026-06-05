@@ -3,8 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Platform } from
 import { Ionicons } from '@expo/vector-icons';
 import tw from 'twrnc';
 import { useSettings } from './SettingsContext';
-import AppHeader from './AppHeader';
-import BottomMenuBar from './BottomMenuBar';
+import AppHeader from '../AppHeader';
+import BottomMenuBar from '../BottomMenuBar';
 
 export default function SettingMainScreen({ navigation }) {
   const { settings } = useSettings();
