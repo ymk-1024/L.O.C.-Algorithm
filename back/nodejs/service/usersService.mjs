@@ -31,29 +31,33 @@ const usersService = {
         } catch (error) {
             throw new Error(`DB Error: ${error.message}`);
         }
-    },
+    }
+};
 
-    // ユーザー作成
-    createUser: async (username, password, email) => {
-        try {
-            // UUID の生成は「ビジネスロジック」なので Service 層の仕事！
-            const newUuid = crypto.randomUUID();
-            
-            // Repository にデータを渡して保存してもらう
-            const newUser = await usersRepository.createUser(newUuid, username, password, email);
+// パスワードハッシュ化
+const hashPassword = (password) => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const key = crypto.scryptSync(password, salt, 64).toString('hex');
+    return `${salt}:${key}`;
+};
 
-            return { 
-                status: 201, 
-                message: 'User created successfully',
-                data: newUser
-            };
-        } catch (error) {
-            // メールアドレス重複などのエラーキャッチ
-            if (error.code === 'ER_DUP_ENTRY') {
-                return { status: 409, message: 'Email already exists' };
-            }
-            throw new Error(`DB Error: ${error.message}`);
+// ユーザー作成
+usersService.createUser = async (username, password, email) => {
+    try {
+        const newUuid = crypto.randomUUID();
+        const hashedPassword = hashPassword(password);
+        const newUser = await usersRepository.createUser(newUuid, username, hashedPassword, email);
+
+        return {
+            status: 201,
+            message: 'User created successfully',
+            data: newUser
+        };
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            return { status: 409, message: 'Email already exists' };
         }
+        throw new Error(`DB Error: ${error.message}`);
     }
 };
 

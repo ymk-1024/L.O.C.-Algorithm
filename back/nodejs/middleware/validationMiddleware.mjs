@@ -1,15 +1,20 @@
 // [NEW] 検証・サニタイズ ミドルウェア
 import xss from 'xss';
 
-// XSSサニタイズ（すべてのリクエストボディに適用）
+const sanitizeObject = (obj) => {
+  if (!obj || typeof obj !== 'object') return;
+  Object.keys(obj).forEach(key => {
+    if (typeof obj[key] === 'string') {
+      obj[key] = xss(obj[key]);
+    }
+  });
+};
+
+// XSSサニタイズ（リクエストの body / params / query に適用）
 export const sanitizeBody = (req, res, next) => {
-  if (req.body && typeof req.body === 'object') {
-    Object.keys(req.body).forEach(key => {
-      if (typeof req.body[key] === 'string') {
-        req.body[key] = xss(req.body[key]);
-      }
-    });
-  }
+  sanitizeObject(req.body);
+  sanitizeObject(req.params);
+  sanitizeObject(req.query);
   next();
 };
 
