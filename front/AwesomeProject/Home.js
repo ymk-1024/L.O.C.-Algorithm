@@ -22,7 +22,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.screenContainer}>
-      {/* <AppHeader /> */}
+      <AppHeader />
 
       {/* メインのコンテナカード */}
       <View style={styles.card}>
