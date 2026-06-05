@@ -1,18 +1,369 @@
 #include <Arduino.h>
+#include <Preferences.h>
+#include <WiFi.h>
 
-// put function declarations here:
-int myFunction(int, int);
+// 仮置きのピン定義
+#define POWER_LED 1
+#define STATUS_LED 2
+#define MOTOR_PWM1 3
+#define MOTOR_PWM2 4
+#define MOTOR_PWM3 5
+#define MOTOR_PWM4 6
+#define MOTOR_PWM5 7
+#define MOTOR_PWM6 8
+#define MOTOR_PWM7 9
+#define MOTOR_PWM8 10
+#define MOTOR_PWM9 11
+#define MOTOR_PWM10 12
+#define EXPAND_PIN1 13
+#define EXPAND_PIN2 14
+#define SENSOR_IN 15
+#define SENSOR_OUT 16
+#define CONFIG_RESET 17
 
-void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+
+// 定数
+const int ledChannel = 0;   // 使用するPWMチャンネル (0〜15)
+const int freq = 5000;      // PWM周波数 (5000Hz)
+const int resolution = 8;   // 分解能: 8bit (0〜255)
+
+// 定義
+
+Preferences prefs;
+WebServer server(80);
+
+bool configMode = false;
+
+// ====================
+// WiFi設定保存
+// ====================
+
+void saveWifi(const String& ssid, const String& password)
+{
+    prefs.begin("wifi", false);
+
+    prefs.putString("ssid", ssid);
+    prefs.putString("pass", password);
+
+    prefs.end();
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+String loadSSID()
+{
+    prefs.begin("wifi", true);
+    String value = prefs.getString("ssid", "");
+    prefs.end();
+
+    return value;
 }
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+String loadPassword()
+{
+    prefs.begin("wifi", true);
+    String value = prefs.getString("pass", "");
+    prefs.end();
+
+    return value;
+}
+
+void clearWifi()
+{
+    prefs.begin("wifi", false);
+    prefs.clear();
+    prefs.end();
+}
+
+// ====================
+// WebUI
+// ====================
+
+const char* configPage = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>LOC Setup</title>
+<style>
+body{
+    font-family:sans-serif;
+    max-width:400px;
+    margin:auto;
+    padding:20px;
+}
+input{
+    width:100%;
+    padding:8px;
+    margin:5px 0;
+}
+button{
+    width:100%;
+    padding:10px;
+}
+</style>
+</head>
+<body>
+
+<h2>LOC WiFi Setup</h2>
+
+<form action="/save" method="POST">
+
+SSID<br>
+<input type="text" name="ssid">
+
+Password<br>
+<input type="password" name="password">
+
+<br><br>
+
+<button type="submit">
+Save
+</button>
+
+</form>
+
+</body>
+</html>
+)rawliteral";
+
+void handleRoot()
+{
+    server.send(200, "text/html", configPage);
+}
+
+void handleSave()
+{
+    if (!server.hasArg("ssid"))
+    {
+        server.send(400, "text/plain", "SSID Missing");
+        return;
+    }
+
+    String ssid = server.arg("ssid");
+    String password = server.arg("password");
+
+    saveWifi(ssid, password);
+
+    server.send(
+        200,
+        "text/html",
+        "<h1>Saved</h1><p>Rebooting...</p>"
+    );
+
+    delay(2000);
+
+    ESP.restart();
+}
+
+void startWebServer()
+{
+    server.on("/", HTTP_GET, handleRoot);
+
+    server.on("/save", HTTP_POST, handleSave);
+
+    server.begin();
+
+    Serial.println("Web Server Started");
+}
+
+// ====================
+// APモード
+// ====================
+
+void startConfigMode()
+{
+    configMode = true;
+
+    WiFi.disconnect(true);
+
+    delay(100);
+
+    WiFi.mode(WIFI_AP);
+
+    WiFi.softAP("LOC-Setup");
+
+    IPAddress ip = WiFi.softAPIP();
+
+    Serial.println();
+    Serial.println("===== CONFIG MODE =====");
+    Serial.print("SSID : ");
+    Serial.println("LOC-Setup");
+
+    Serial.print("IP   : ");
+    Serial.println(ip);
+
+    startWebServer();
+}
+
+// ====================
+// WiFi接続
+// ====================
+
+bool connectWiFi()
+{
+    String ssid = loadSSID();
+    String pass = loadPassword();
+
+    if (ssid.isEmpty())
+    {
+        Serial.println("No WiFi Config");
+        return false;
+    }
+
+    Serial.println();
+    Serial.println("Connecting WiFi");
+
+    Serial.print("SSID: ");
+    Serial.println(ssid);
+
+    WiFi.mode(WIFI_STA);
+
+    WiFi.begin(
+        ssid.c_str(),
+        pass.c_str()
+    );
+
+    unsigned long startTime = millis();
+
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+
+        Serial.print(".");
+
+        if (millis() - startTime > 15000)
+        {
+            Serial.println();
+            Serial.println("Connection Timeout");
+
+            return false;
+        }
+    }
+
+    Serial.println();
+    Serial.println("WiFi Connected");
+
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+
+    return true;
+}
+
+class MotorController (int MotorPin)
+{
+    MotorController(int MotorPin) : MotorPin(MotorPin) {
+        ledcAttachPin(ledPin, ledChannel);
+    }
+
+    void setSpeed(int speed) {
+        // speedは-255から255の範囲で、正の値は前進、負の値は後退を表すと仮定
+        int pwmValue = abs(speed);
+        if (pwmValue > 255) pwmValue = 255; // 上限を255に制限
+
+        ledcWrite(ledChannel, pwmValue);
+    }
+}
+
+class LEDController (int ledPin)
+{
+    LEDController(int ledPin) : ledPin(ledPin) {
+        pinMode(ledPin, OUTPUT);
+    }
+
+    void setState(bool state) {
+        digitalWrite(ledPin, state ? HIGH : LOW);
+    }
+}
+
+class SensorController (int sensorPin)
+{
+    SensorController(int sensorPin) : sensorPin(sensorPin) {
+        pinMode(sensorPin, INPUT);
+    }
+
+    int readValue() {
+        return digitalRead(sensorPin);
+    }
+};
+
+class ExpandablePinController (int pin) {
+    ExpandablePinController(int pin) : pin(pin) {
+        pinMode(pin, OUTPUT);
+    }
+
+    void setState(bool state) {
+        digitalWrite(pin, state ? HIGH : LOW);
+    }
+};
+
+// ====================
+// Setup
+// ====================
+
+void setup()
+{
+    Serial.begin(115200);
+    ledcSetup(ledChannel, freq, resolution);
+
+    pinMode(POWER_LED, OUTPUT);
+    pinMode(STATUS_LED, OUTPUT);
+
+    pinMode(CONFIG_RESET, INPUT_PULLUP);
+
+    digitalWrite(POWER_LED, HIGH);
+
+    Serial.println();
+    Serial.println("LOC Controller Boot");
+
+    // リセットボタン押下
+    if (digitalRead(CONFIG_RESET) == LOW)
+    {
+        Serial.println("Config Reset Requested");
+
+        clearWifi();
+
+        delay(1000);
+    }
+
+    // WiFi接続
+    if (!connectWiFi())
+    {
+        startConfigMode();
+    }
+    else
+    {
+        configMode = false;
+    }
+}
+
+// ====================
+// Loop
+// ====================
+
+void loop()
+{
+    if (configMode)
+    {
+        server.handleClient();
+
+        static uint32_t lastBlink = 0;
+        static bool ledState = false;
+
+        if (millis() - lastBlink > 500)
+        {
+            ledState = !ledState;
+
+            digitalWrite(
+                STATUS_LED,
+                ledState
+            );
+
+            lastBlink = millis();
+        }
+    }
+    else
+    {
+        digitalWrite(STATUS_LED, HIGH);
+
+        delay(10);
+    }
 }
