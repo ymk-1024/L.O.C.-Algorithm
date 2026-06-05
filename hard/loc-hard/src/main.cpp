@@ -1,10 +1,12 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WebServer.h>
 
 // 仮置きのピン定義
 #define POWER_LED 1
 #define STATUS_LED 2
+
 #define MOTOR_PWM1 3
 #define MOTOR_PWM2 4
 #define MOTOR_PWM3 5
@@ -15,19 +17,22 @@
 #define MOTOR_PWM8 10
 #define MOTOR_PWM9 11
 #define MOTOR_PWM10 12
+
 #define EXPAND_PIN1 13
 #define EXPAND_PIN2 14
+
 #define SENSOR_IN 15
 #define SENSOR_OUT 16
+
 #define CONFIG_RESET 17
 
+// PWM設定
+const int freq = 5000;
+const int resolution = 8;
 
-// 定数
-const int ledChannel = 0;   // 使用するPWMチャンネル (0〜15)
-const int freq = 5000;      // PWM周波数 (5000Hz)
-const int resolution = 8;   // 分解能: 8bit (0〜255)
-
-// 定義
+// ====================
+// グローバル
+// ====================
 
 Preferences prefs;
 WebServer server(80);
@@ -35,7 +40,106 @@ WebServer server(80);
 bool configMode = false;
 
 // ====================
-// WiFi設定保存
+// ハードウェアクラス
+// ====================
+
+class MotorController
+{
+private:
+    int motorPin;
+
+public:
+    MotorController(int pin)
+        : motorPin(pin)
+    {
+        ledcAttach(motorPin, freq, resolution);
+    }
+
+    void setSpeed(uint8_t speed)
+    {
+        ledcWrite(motorPin, speed);
+    }
+};
+
+class LEDController
+{
+private:
+    int ledPin;
+
+public:
+    LEDController(int pin)
+        : ledPin(pin)
+    {
+        pinMode(ledPin, OUTPUT);
+    }
+
+    void setState(bool state)
+    {
+        digitalWrite(ledPin, state ? HIGH : LOW);
+    }
+
+    void toggle()
+    {
+        digitalWrite(ledPin, !digitalRead(ledPin));
+    }
+};
+
+class SensorController
+{
+private:
+    int sensorPin;
+
+public:
+    SensorController(int pin)
+        : sensorPin(pin)
+    {
+        pinMode(sensorPin, INPUT);
+    }
+
+    int readValue()
+    {
+        return digitalRead(sensorPin);
+    }
+};
+
+class ExpandablePinController
+{
+private:
+    int pin;
+
+public:
+    ExpandablePinController(int pinNum)
+        : pin(pinNum)
+    {
+        pinMode(pin, OUTPUT);
+    }
+
+    void setState(bool state)
+    {
+        digitalWrite(pin, state ? HIGH : LOW);
+    }
+};
+
+class SwController
+{
+private:
+    int swPin;
+
+public:
+    SwController(int pin)
+        : swPin(pin)
+    {
+        pinMode(swPin, INPUT_PULLUP);
+    }
+
+    bool isPressed()
+    {
+        return digitalRead(swPin) == LOW;
+    }
+};
+
+// ====================
+// WiFi設定
 // ====================
 
 void saveWifi(const String& ssid, const String& password)
@@ -83,23 +187,6 @@ const char* configPage = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <title>LOC Setup</title>
-<style>
-body{
-    font-family:sans-serif;
-    max-width:400px;
-    margin:auto;
-    padding:20px;
-}
-input{
-    width:100%;
-    padding:8px;
-    margin:5px 0;
-}
-button{
-    width:100%;
-    padding:10px;
-}
-</style>
 </head>
 <body>
 
@@ -108,12 +195,10 @@ button{
 <form action="/save" method="POST">
 
 SSID<br>
-<input type="text" name="ssid">
+<input type="text" name="ssid"><br><br>
 
 Password<br>
-<input type="password" name="password">
-
-<br><br>
+<input type="password" name="password"><br><br>
 
 <button type="submit">
 Save
@@ -157,7 +242,6 @@ void handleSave()
 void startWebServer()
 {
     server.on("/", HTTP_GET, handleRoot);
-
     server.on("/save", HTTP_POST, handleSave);
 
     server.begin();
@@ -178,18 +262,10 @@ void startConfigMode()
     delay(100);
 
     WiFi.mode(WIFI_AP);
-
     WiFi.softAP("LOC-Setup");
 
-    IPAddress ip = WiFi.softAPIP();
-
-    Serial.println();
     Serial.println("===== CONFIG MODE =====");
-    Serial.print("SSID : ");
-    Serial.println("LOC-Setup");
-
-    Serial.print("IP   : ");
-    Serial.println(ip);
+    Serial.println(WiFi.softAPIP());
 
     startWebServer();
 }
@@ -205,22 +281,11 @@ bool connectWiFi()
 
     if (ssid.isEmpty())
     {
-        Serial.println("No WiFi Config");
         return false;
     }
 
-    Serial.println();
-    Serial.println("Connecting WiFi");
-
-    Serial.print("SSID: ");
-    Serial.println(ssid);
-
     WiFi.mode(WIFI_STA);
-
-    WiFi.begin(
-        ssid.c_str(),
-        pass.c_str()
-    );
+    WiFi.begin(ssid.c_str(), pass.c_str());
 
     unsigned long startTime = millis();
 
@@ -228,72 +293,42 @@ bool connectWiFi()
     {
         delay(500);
 
-        Serial.print(".");
-
         if (millis() - startTime > 15000)
         {
-            Serial.println();
-            Serial.println("Connection Timeout");
-
             return false;
         }
     }
 
-    Serial.println();
     Serial.println("WiFi Connected");
-
-    Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
 
     return true;
 }
 
-class MotorController (int MotorPin)
-{
-    MotorController(int MotorPin) : MotorPin(MotorPin) {
-        ledcAttachPin(ledPin, ledChannel);
-    }
+// ====================
+// ハード定義
+// ====================
 
-    void setSpeed(int speed) {
-        // speedは-255から255の範囲で、正の値は前進、負の値は後退を表すと仮定
-        int pwmValue = abs(speed);
-        if (pwmValue > 255) pwmValue = 255; // 上限を255に制限
+LEDController statusLED(STATUS_LED);
+LEDController powerLED(POWER_LED);
 
-        ledcWrite(ledChannel, pwmValue);
-    }
-}
+MotorController vibe1(MOTOR_PWM1);
+MotorController vibe2(MOTOR_PWM2);
+MotorController vibe3(MOTOR_PWM3);
+MotorController vibe4(MOTOR_PWM4);
+MotorController vibe5(MOTOR_PWM5);
+MotorController vibe6(MOTOR_PWM6);
+MotorController vibe7(MOTOR_PWM7);
+MotorController vibe8(MOTOR_PWM8);
+MotorController vibe9(MOTOR_PWM9);
+MotorController vibe10(MOTOR_PWM10);
 
-class LEDController (int ledPin)
-{
-    LEDController(int ledPin) : ledPin(ledPin) {
-        pinMode(ledPin, OUTPUT);
-    }
+SensorController sensor(SENSOR_IN);
 
-    void setState(bool state) {
-        digitalWrite(ledPin, state ? HIGH : LOW);
-    }
-}
+ExpandablePinController expand1(EXPAND_PIN1);
+ExpandablePinController expand2(EXPAND_PIN2);
 
-class SensorController (int sensorPin)
-{
-    SensorController(int sensorPin) : sensorPin(sensorPin) {
-        pinMode(sensorPin, INPUT);
-    }
-
-    int readValue() {
-        return digitalRead(sensorPin);
-    }
-};
-
-class ExpandablePinController (int pin) {
-    ExpandablePinController(int pin) : pin(pin) {
-        pinMode(pin, OUTPUT);
-    }
-
-    void setState(bool state) {
-        digitalWrite(pin, state ? HIGH : LOW);
-    }
-};
+SwController configResetSw(CONFIG_RESET);
 
 // ====================
 // Setup
@@ -302,36 +337,24 @@ class ExpandablePinController (int pin) {
 void setup()
 {
     Serial.begin(115200);
-    ledcSetup(ledChannel, freq, resolution);
 
-    pinMode(POWER_LED, OUTPUT);
-    pinMode(STATUS_LED, OUTPUT);
-
-    pinMode(CONFIG_RESET, INPUT_PULLUP);
-
-    digitalWrite(POWER_LED, HIGH);
+    powerLED.setState(true);
 
     Serial.println();
     Serial.println("LOC Controller Boot");
 
-    // リセットボタン押下
-    if (digitalRead(CONFIG_RESET) == LOW)
+    if (configResetSw.isPressed())
     {
-        Serial.println("Config Reset Requested");
-
         clearWifi();
+
+        Serial.println("WiFi Config Cleared");
 
         delay(1000);
     }
 
-    // WiFi接続
     if (!connectWiFi())
     {
         startConfigMode();
-    }
-    else
-    {
-        configMode = false;
     }
 }
 
@@ -346,23 +369,20 @@ void loop()
         server.handleClient();
 
         static uint32_t lastBlink = 0;
-        static bool ledState = false;
 
         if (millis() - lastBlink > 500)
         {
-            ledState = !ledState;
-
-            digitalWrite(
-                STATUS_LED,
-                ledState
-            );
+            statusLED.toggle();
 
             lastBlink = millis();
         }
     }
     else
     {
-        digitalWrite(STATUS_LED, HIGH);
+        statusLED.setState(true);
+
+        // テスト
+        vibe1.setSpeed(128);
 
         delay(10);
     }
