@@ -40,6 +40,60 @@ export const validateUserCreation = (req, res, next) => {
   next();
 };
 
+export const validateDeviceCreation = (req, res, next) => {
+  const { userUuid, name, type, status } = req.body;
+  const errors = [];
+
+  if (!userUuid || typeof userUuid !== 'string' || userUuid.trim() === '') {
+    errors.push('userUuid is required');
+  }
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    errors.push('name is required');
+  }
+  if (!type || typeof type !== 'string' || type.trim() === '') {
+    errors.push('type is required');
+  }
+  if (!status || typeof status !== 'string' || status.trim() === '') {
+    errors.push('status is required');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ status: 400, error: 'Validation failed', details: errors });
+  }
+  next();
+};
+
+export const validateSitDataCreation = (req, res, next) => {
+  const { deviceUuid } = req.body;
+  const errors = [];
+
+  if (!deviceUuid || typeof deviceUuid !== 'string' || deviceUuid.trim() === '') {
+    errors.push('deviceUuid is required');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ status: 400, error: 'Validation failed', details: errors });
+  }
+  next();
+};
+
+export const validateActivityDataCreation = (req, res, next) => {
+  const { deviceUuid, type } = req.body;
+  const errors = [];
+
+  if (!deviceUuid || typeof deviceUuid !== 'string' || deviceUuid.trim() === '') {
+    errors.push('deviceUuid is required');
+  }
+  if (!type || typeof type !== 'string' || type.trim() === '') {
+    errors.push('type is required');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ status: 400, error: 'Validation failed', details: errors });
+  }
+  next();
+};
+
 // リクエストロギング
 export const requestLogger = (req, res, next) => {
   const start = Date.now();
