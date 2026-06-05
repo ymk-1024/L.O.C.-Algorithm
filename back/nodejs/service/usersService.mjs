@@ -1,12 +1,64 @@
-const test = async (testStr) => {
-    let testSStr = 'NG';
-    if (testStr == 'OK') {
-        testSStr = 'OK';
+// service/usersService.mjs
+// [UPDATE] db ではなく usersRepository をインポート
+import usersRepository from '../repository/usersRepository.mjs'; 
+import crypto from 'crypto';
+
+const usersService = {
+    // テスト用
+    test: async (msg) => {
+        return { status: 200, message: `Service layer is working! Received: ${msg}` };
+    },
+
+    // 全ユーザー取得
+    getAllUsers: async () => {
+        try {
+            // [UPDATE] SQL は書かずに Repository にお願いするだけ！
+            const users = await usersRepository.getAllUsers();
+            return { status: 200, data: users };
+        } catch (error) {
+            throw new Error(`DB Error: ${error.message}`);
+        }
+    },
+
+    // UUID でユーザー取得
+    getUserById: async (uuid) => {
+        try {
+            const user = await usersRepository.getUserById(uuid);
+            if (!user) {
+                return { status: 404, message: 'User not found' };
+            }
+            return { status: 200, data: user };
+        } catch (error) {
+            throw new Error(`DB Error: ${error.message}`);
+        }
     }
-
-    return { status: 200, message: 'HANDLER/SERVICE OK', error: 'noError' };
-}
-
-export default {
-    test
 };
+
+// パスワードハッシュ化
+const hashPassword = (password) => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const key = crypto.scryptSync(password, salt, 64).toString('hex');
+    return `${salt}:${key}`;
+};
+
+// ユーザー作成
+usersService.createUser = async (username, password, email) => {
+    try {
+        const newUuid = crypto.randomUUID();
+        const hashedPassword = hashPassword(password);
+        const newUser = await usersRepository.createUser(newUuid, username, hashedPassword, email);
+
+        return {
+            status: 201,
+            message: 'User created successfully',
+            data: newUser
+        };
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            return { status: 409, message: 'Email already exists' };
+        }
+        throw new Error(`DB Error: ${error.message}`);
+    }
+};
+
+export default usersService;
