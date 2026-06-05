@@ -14,14 +14,16 @@ export default function BottomMenuBar({ activeTab, navigation }) {
   ];
 
   const handlePress = (id) => {
-    if (id === 'Settings') {
-      navigation.navigate('SettingMain');
+    if (id === 'Home') {
+      navigation.navigate('Home');
+    } else if (id === 'Settings') {
+      navigation.navigate('Settings');
+    } else if (id === 'Account') {
+      navigation.navigate('Account');
     } else {
       const labelMap = {
         Records: '記録',
         Schedule: 'スケジュール',
-        Home: 'ホーム',
-        Account: 'アカウント',
       };
       Alert.alert('準備中', `「${labelMap[id]}」画面は現在開発中です。`);
     }
