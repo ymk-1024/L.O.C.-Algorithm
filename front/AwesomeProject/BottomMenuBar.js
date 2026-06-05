@@ -15,7 +15,7 @@ export default function BottomMenuBar({ activeTab, navigation }) {
 
   const handlePress = (id) => {
     if (id === 'Settings') {
-      navigation.navigate('SettingMain');
+      navigation.navigate('Settings');
     } else {
       const labelMap = {
         Records: '記録',

@@ -23,7 +23,7 @@ export default function Setting() {
             animation: 'slide_from_right',
           }}
         >
-          <Stack.Screen name="SettingMain" component={SettingMainScreen} />
+          <Stack.Screen name="Settings" component={SettingMainScreen} />
           <Stack.Screen name="WifiSetting" component={WifiSettingScreen} />
           <Stack.Screen name="Details" component={DetailsScreen} />
           <Stack.Screen name="DeviceMgmt" component={DeviceMgmtScreen} />
