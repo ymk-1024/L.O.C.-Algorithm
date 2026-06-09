@@ -33,8 +33,33 @@ const createSitData = async (req, res, next) => {
   }
 };
 
+const updateSitData = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const deviceUuid = sanitize(req.body.deviceUuid);
+    const endAt = sanitize(req.body.endAt);
+
+    const result = await sitDataService.updateSitData(uuid, deviceUuid, endAt);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteSitData = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const result = await sitDataService.deleteSitData(uuid);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   getAllSitData,
   getSitDataById,
   createSitData,
+  updateSitData,
+  deleteSitData,
 };

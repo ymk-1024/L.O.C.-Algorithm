@@ -61,4 +61,48 @@ usersService.createUser = async (username, password, email) => {
     }
 };
 
+usersService.updateUser = async (uuid, username, password, email) => {
+    try {
+        const existingUser = await usersRepository.getUserById(uuid);
+        if (!existingUser) {
+            return { status: 404, message: 'User not found' };
+        }
+
+        const nextUsername = username ?? existingUser.username;
+        const nextEmail = email ?? existingUser.email;
+        const nextPassword = password ? hashPassword(password) : existingUser.password;
+
+        const updatedUser = await usersRepository.updateUser(uuid, nextUsername, nextPassword, nextEmail);
+
+        return {
+            status: 200,
+            message: 'User updated successfully',
+            data: updatedUser
+        };
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            return { status: 409, message: 'Email already exists' };
+        }
+        throw new Error(`DB Error: ${error.message}`);
+    }
+};
+
+usersService.deleteUser = async (uuid) => {
+    try {
+        const existingUser = await usersRepository.getUserById(uuid);
+        if (!existingUser) {
+            return { status: 404, message: 'User not found' };
+        }
+
+        await usersRepository.deleteUser(uuid);
+
+        return {
+            status: 200,
+            message: 'User deleted successfully'
+        };
+    } catch (error) {
+        throw new Error(`DB Error: ${error.message}`);
+    }
+};
+
 export default usersService;

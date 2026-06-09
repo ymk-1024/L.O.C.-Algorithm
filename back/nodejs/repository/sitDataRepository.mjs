@@ -33,4 +33,16 @@ export const createSitData = async (uuid, deviceUuid, endAt = null) => {
   return { uuid, deviceUuid, endAt };
 };
 
-export default { getAllSitData, getSitDataById, createSitData };
+export const updateSitData = async (uuid, deviceUuid, endAt = null) => {
+  await query(
+    'UPDATE sit_data SET device_uuid = ?, end_at = ? WHERE uuid = ?',
+    [deviceUuid, endAt, uuid]
+  );
+  return { uuid, deviceUuid, endAt };
+};
+
+export const deleteSitData = async (uuid) => {
+  await query('DELETE FROM sit_data WHERE uuid = ?', [uuid]);
+};
+
+export default { getAllSitData, getSitDataById, createSitData, updateSitData, deleteSitData };
