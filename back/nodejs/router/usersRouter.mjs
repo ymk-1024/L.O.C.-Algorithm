@@ -12,5 +12,9 @@ user.get('/', usersHandler.getAllUsers);
 user.get('/:uuid', usersHandler.getUserById);
 // [NEW] POST / - ユーザー作成（username, password, email のみ必須。uuid はサーバー側で自動生成）
 user.post('/', validateUserCreation, usersHandler.createUser);
+// [NEW] PUT /:uuid - ユーザー更新
+user.put('/:uuid', usersHandler.updateUser);
+// [NEW] DELETE /:uuid - ユーザー削除
+user.delete('/:uuid', usersHandler.deleteUser);
 
 export default user;

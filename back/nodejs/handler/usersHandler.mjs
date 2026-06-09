@@ -53,9 +53,35 @@ const createUser = async (req, res, next) => {
   }
 };
 
+const updateUser = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const username = sanitize(req.body.username);
+    const password = sanitize(req.body.password);
+    const email = sanitize(req.body.email);
+
+    const result = await usersService.updateUser(uuid, username, password, email);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteUser = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const result = await usersService.deleteUser(uuid);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   test,
   getAllUsers,
   getUserById,
-  createUser
+  createUser,
+  updateUser,
+  deleteUser
 };

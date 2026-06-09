@@ -32,4 +32,18 @@ export const createUser = async (uuid, username, password, email) => {
   return { uuid, username, email };
 };
 
-export default { getAllUsers, getUserById, createUser };
+// ユーザー更新
+export const updateUser = async (uuid, username, password, email) => {
+  await query(
+    'UPDATE users SET username = ?, password = ?, email = ?, update_at = CURRENT_TIMESTAMP WHERE uuid = ?',
+    [username, password, email, uuid]
+  );
+  return { uuid, username, email };
+};
+
+// ユーザー削除
+export const deleteUser = async (uuid) => {
+  await query('DELETE FROM users WHERE uuid = ?', [uuid]);
+};
+
+export default { getAllUsers, getUserById, createUser, updateUser, deleteUser };
