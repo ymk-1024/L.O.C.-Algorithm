@@ -6,6 +6,8 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 #define POWER_LED      2
 #define STATUS_LED     4
@@ -24,6 +26,9 @@
 #define SENSOR_IN      34
 #define CONFIG_RESET   13
 
+// バックエンドサーバーのベースURL (実環境に合わせて変更可能)
+#define BACKEND_BASE_URL "http://192.168.1.100:3000" 
+
 const int freq = 5000;
 const int resolution = 8;
 
@@ -32,7 +37,6 @@ WebServer server(80);
 
 // BLE & Wi-Fi configuration variables
 #define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E" // NUS UART Service UUID
-#define INDIVIDUAL_IDENTIFIER_UUID "12345678-1234-5678-1234-56789abcdef0" // Unique identifier for this device (can be used for filtering in apps)
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_ID "6E400004-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -47,6 +51,17 @@ bool configMode = false;
 bool bleMode = false;
 String bleSSID = "";
 String blePassword = "";
+String bleOwnerToken = ""; // BLEから受信するOwnerToken用
+
+String myDeviceUUID = "";
+String myOwnerToken = "";
+bool isRegistered = false; // デバイスがサーバーに登録済みか
+
+// ポーリング制御用変数
+unsigned long lastPollTime = 0;
+unsigned long pollInterval = 10000; // デフォルト10秒間隔
+bool isVibrating = false;
+unsigned long vibrationStartTime = 0;
 
 // ====================
 // Hardware Classes
@@ -125,6 +140,110 @@ public:
     }
 };
 
+// Hardware Objects
+LEDController statusLED(STATUS_LED);
+LEDController powerLED(POWER_LED);
+
+MotorController vibe1(MOTOR_PWM1);
+MotorController vibe2(MOTOR_PWM2);
+MotorController vibe3(MOTOR_PWM3);
+MotorController vibe4(MOTOR_PWM4);
+MotorController vibe5(MOTOR_PWM5);
+MotorController vibe6(MOTOR_PWM6);
+MotorController vibe7(MOTOR_PWM7);
+MotorController vibe8(MOTOR_PWM8);
+MotorController vibe9(MOTOR_PWM9);
+MotorController vibe10(MOTOR_PWM10);
+
+SensorController sensor(SENSOR_IN);
+ExpandablePinController expand1(EXPAND_PIN1);
+ExpandablePinController expand2(EXPAND_PIN2);
+SwController configResetSw(CONFIG_RESET);
+
+// 全モーターの速度を設定するヘルパー
+void setAllMotorsSpeed(uint8_t speed) {
+    vibe1.setSpeed(speed);
+    vibe2.setSpeed(speed);
+    vibe3.setSpeed(speed);
+    vibe4.setSpeed(speed);
+    vibe5.setSpeed(speed);
+    vibe6.setSpeed(speed);
+    vibe7.setSpeed(speed);
+    vibe8.setSpeed(speed);
+    vibe9.setSpeed(speed);
+    vibe10.setSpeed(speed);
+}
+
+// ====================
+// UUID Generation & Preferences
+// ====================
+
+// RFC4122準拠のUUID v4生成ロジック
+String generateUUID() {
+    String uuid = "";
+    for (int i = 0; i < 32; i++) {
+        if (i == 8 || i == 12 || i == 16 || i == 20) {
+            uuid += "-";
+        }
+        int r = esp_random() % 16;
+        if (i == 12) {
+            uuid += "4"; // UUID version 4
+        } else if (i == 16) {
+            uuid += String((r & 0x3) | 0x8, HEX); // UUID variant (8, 9, a, b)
+        } else {
+            uuid += String(r, HEX);
+        }
+    }
+    return uuid;
+}
+
+void loadDeviceConfig() {
+    prefs.begin("device_cfg", false);
+    myDeviceUUID = prefs.getString("uuid", "");
+    if (myDeviceUUID.isEmpty()) {
+        myDeviceUUID = generateUUID();
+        prefs.putString("uuid", myDeviceUUID);
+        Serial.println("Generated new UUID: " + myDeviceUUID);
+    } else {
+        Serial.println("Loaded existing UUID: " + myDeviceUUID);
+    }
+    
+    myOwnerToken = prefs.getString("token", "");
+    isRegistered = prefs.getBool("registered", false);
+    prefs.end();
+}
+
+void saveOwnerToken(const String& token) {
+    prefs.begin("device_cfg", false);
+    prefs.putString("token", token);
+    prefs.end();
+    myOwnerToken = token;
+    Serial.println("Saved OwnerToken");
+}
+
+void setRegisteredState(bool state) {
+    prefs.begin("device_cfg", false);
+    prefs.putBool("registered", state);
+    prefs.end();
+    isRegistered = state;
+    Serial.println("Device Registration Status: " + String(state ? "Registered" : "Unregistered"));
+}
+
+void clearWifiAndConfig() {
+    prefs.begin("wifi", false);
+    prefs.clear();
+    prefs.end();
+    
+    prefs.begin("device_cfg", false);
+    prefs.clear(); // UUIDも含めリセット
+    prefs.end();
+    
+    myDeviceUUID = "";
+    myOwnerToken = "";
+    isRegistered = false;
+    Serial.println("All config cleared.");
+}
+
 // ====================
 // WiFi Management
 // ====================
@@ -150,10 +269,158 @@ String loadPassword() {
     return value;
 }
 
-void clearWifi() {
-    prefs.begin("wifi", false);
-    prefs.clear();
-    prefs.end();
+// ====================
+// Security & API Communication
+// ====================
+
+// ランダムなnonceを生成する
+String generateNonce() {
+    String charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    String nonce = "";
+    for (int i = 0; i < 16; i++) {
+        nonce += charset[esp_random() % charset.length()];
+    }
+    return nonce;
+}
+
+// サーバーへ共通ヘッダを付与したHTTPリクエストを送信するヘルパー関数
+bool sendApiRequest(const String& path, const String& method, const String& payload, String& response) {
+    if (WiFi.status() != WL_CONNECTED) {
+        return false;
+    }
+
+    WiFiClient client; // 実運用時は WiFiClientSecure と証明書検証を使用
+    HTTPClient http;
+    String url = String(BACKEND_BASE_URL) + path;
+    
+    http.begin(client, url);
+    
+    // 設計仕様書に定義されている共通ヘッダの追加
+    String nonce = generateNonce();
+    // 本来はNTPで同期したUNIX時間を使用。ここでは代替としてmillis()を使用
+    String timestamp = String(millis() / 1000 + 1700000000); 
+
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Nonce", nonce);
+    http.addHeader("X-Timestamp", timestamp);
+    http.addHeader("X-Device-UUID", myDeviceUUID);
+    
+    if (!myOwnerToken.isEmpty()) {
+        http.addHeader("Authorization", "Bearer " + myOwnerToken);
+    }
+
+    int httpCode = -1;
+    if (method == "POST") {
+        httpCode = http.POST(payload);
+    } else if (method == "GET") {
+        httpCode = http.GET();
+    } else if (method == "PUT") {
+        httpCode = http.PUT(payload);
+    }
+
+    if (httpCode > 0) {
+        response = http.getString();
+        Serial.printf("[HTTP] %s to %s response: %d\n", method.c_str(), path.c_str(), httpCode);
+        http.end();
+        return (httpCode >= 200 && httpCode < 300);
+    } else {
+        Serial.printf("[HTTP] %s failed, error: %s\n", method.c_str(), http.errorToString(httpCode).c_str());
+        http.end();
+        return false;
+    }
+}
+
+// デバイスの自己登録
+bool registerDevice() {
+    if (myOwnerToken.isEmpty()) {
+        Serial.println("Skipping registration: OwnerToken is empty.");
+        return false;
+    }
+
+    Serial.println("Registering device on server...");
+    
+    // 設計書と現状のバックエンドスキーマを想定したペイロード
+    String payload = "{\"userUuid\":\"" + myOwnerToken + "\",\"name\":\"LOC-Device\",\"type\":\"cushion\",\"status\":\"active\"}";
+    String response = "";
+    
+    if (sendApiRequest("/api/v1.0/device", "POST", payload, response)) {
+        setRegisteredState(true);
+        return true;
+    }
+    return false;
+}
+
+// サーバーへの定期ポーリングと状態送信
+void pollServer() {
+    if (WiFi.status() != WL_CONNECTED || !isRegistered) {
+        return;
+    }
+
+    Serial.println("Polling server for events...");
+    
+    int seatState = sensor.readValue(); // 着座状態 (1 = 着座, 0 = 起立 など)
+    
+    // ポーリングパス。クエリで現在の着座状態も送信
+    String path = "/api/v1.0/sit_data?status=" + String(seatState);
+    String response = "";
+
+    if (sendApiRequest(path, "GET", "", response)) {
+        // レスポンスの簡易パース (それっぽく制御を分岐)
+        // 本来はArduinoJsonを使用しますが、文字列検索で対応します
+        
+        // 1. 振動イベントの検知
+        if (response.indexOf("\"vibrate\":true") != -1 || response.indexOf("\"vibrate\": 1") != -1) {
+            Serial.println("Vibration event triggered by server!");
+            isVibrating = true;
+            vibrationStartTime = millis();
+            setAllMotorsSpeed(200); // モーター起動
+        }
+        
+        // 2. 動的ポーリング間隔の変更検知 (ミリ秒指定)
+        if (response.indexOf("\"interval\":") != -1) {
+            int idx = response.indexOf("\"interval\":");
+            // 簡単な数値抽出
+            String intervalStr = "";
+            for (size_t i = idx + 11; i < response.length(); i++) {
+                char c = response[i];
+                if (c >= '0' && c <= '9') {
+                    intervalStr += c;
+                } else if (intervalStr.length() > 0) {
+                    break;
+                }
+            }
+            if (intervalStr.length() > 0) {
+                pollInterval = intervalStr.toInt();
+                Serial.printf("Polling interval changed to: %d ms\n", pollInterval);
+            }
+        } else {
+            // 設計書要件「次回イベント時刻に近づいた場合は1秒間隔に切り替える」のモック実装
+            if (response.indexOf("\"nextEventTime\":") != -1) {
+                int idx = response.indexOf("\"nextEventTime\":");
+                String nextTimeStr = "";
+                for (size_t i = idx + 16; i < response.length(); i++) {
+                    char c = response[i];
+                    if (c >= '0' && c <= '9') {
+                        nextTimeStr += c;
+                    } else if (nextTimeStr.length() > 0) {
+                        break;
+                    }
+                }
+                if (nextTimeStr.length() > 0) {
+                    long long nextEventTime = atoll(nextTimeStr.c_str());
+                    long long currentTime = millis() / 1000 + 1700000000;
+                    long long diff = nextEventTime - currentTime;
+                    
+                    if (diff > 0 && diff < 30) { // イベントまで30秒未満
+                        pollInterval = 1000; // 1秒ポーリングに切り替え
+                        Serial.println("Event approaching. Switched to 1s polling interval.");
+                    } else {
+                        pollInterval = 10000; // 通常の10秒間隔
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ====================
@@ -197,7 +464,7 @@ void blePrint(const String& msg) {
     if (deviceConnected && pTxCharacteristic != NULL) {
         pTxCharacteristic->setValue(msg.c_str());
         pTxCharacteristic->notify();
-        delay(20); // Small delay to avoid saturating BLE buffers
+        delay(20); // BLEバッファ飽和防止
     }
 }
 
@@ -210,22 +477,20 @@ void startBleConfig() {
     configMode = true;
     bleSSID = "";
     blePassword = "";
+    bleOwnerToken = "";
 
     WiFi.disconnect(true);
     delay(100);
     WiFi.mode(WIFI_OFF);
 
-    // Initialize the BLE Device
+    // BLEの初期化
     BLEDevice::init("LOC-Controller");
 
-    // Create the BLE Server
     pServer = BLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks());
 
-    // Create the BLE Service
     BLEService *pService = pServer->createService(SERVICE_UUID);
 
-    // Create a BLE Characteristic for TX (Notify)
     pTxCharacteristic = pService->createCharacteristic(
                           CHARACTERISTIC_UUID_TX,
                           BLECharacteristic::PROPERTY_NOTIFY
@@ -233,7 +498,6 @@ void startBleConfig() {
                       
     pTxCharacteristic->addDescriptor(new BLE2902());
 
-    // Create a BLE Characteristic for RX (Write)
     BLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
                                              CHARACTERISTIC_UUID_RX,
                                              BLECharacteristic::PROPERTY_WRITE
@@ -241,21 +505,18 @@ void startBleConfig() {
 
     pRxCharacteristic->setCallbacks(new MyCallbacks());
 
-    // Create a BLE Characteristic for ID (Read)
     BLECharacteristic *pIdCharacteristic = pService->createCharacteristic(
                                              CHARACTERISTIC_UUID_ID,
                                              BLECharacteristic::PROPERTY_READ
                                            );
-    pIdCharacteristic->setValue(INDIVIDUAL_IDENTIFIER_UUID);
+    pIdCharacteristic->setValue(myDeviceUUID.c_str()); // 動的生成されたUUIDを設定
 
-    // Start the service
     pService->start();
 
-    // Start advertising
     BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x06);  // help with iPhone connection issues
+    pAdvertising->setMinPreferred(0x06); // iOS対策
     pAdvertising->setMinPreferred(0x12);
     BLEDevice::startAdvertising();
 
@@ -272,12 +533,20 @@ void processBleCommand(const String& input) {
         blePassword = input.substring(5);
         blePassword.trim();
         blePrintln("Password set");
+    } else if (input.startsWith("token ")) { // [NEW] BLEコマンドからOwnerTokenを設定可能にする
+        bleOwnerToken = input.substring(6);
+        bleOwnerToken.trim();
+        blePrintln("OwnerToken set");
     } else if (input == "save") {
         if (bleSSID.isEmpty()) {
             blePrintln("Error: SSID not set");
             return;
         }
         saveWifi(bleSSID, blePassword);
+        if (!bleOwnerToken.isEmpty()) {
+            saveOwnerToken(bleOwnerToken);
+        }
+        setRegisteredState(false); // 設定変更時は再登録を促す
         blePrintln("Saved. Rebooting...");
         delay(1000);
         ESP.restart();
@@ -286,7 +555,7 @@ void processBleCommand(const String& input) {
         delay(500);
         ESP.restart();
     } else if (input == "uuid") {
-        blePrintln("UUID: " + String(INDIVIDUAL_IDENTIFIER_UUID));
+        blePrintln("UUID: " + myDeviceUUID);
     } else {
         blePrintln("Unknown command: " + input);
     }
@@ -296,6 +565,7 @@ void processBleCommand(const String& input) {
 // Web UI
 // ====================
 
+// [UPDATE] OwnerToken の入力欄を追加
 const char* configPage = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -310,6 +580,8 @@ SSID<br>
 <input type="text" name="ssid"><br><br>
 Password<br>
 <input type="password" name="password"><br><br>
+OwnerToken (Server Auth)<br>
+<input type="text" name="token"><br><br>
 <button type="submit">Save</button>
 </form>
 </body>
@@ -328,8 +600,14 @@ void handleSave() {
 
     String ssid = server.arg("ssid");
     String password = server.arg("password");
+    String token = server.arg("token");
 
     saveWifi(ssid, password);
+    if (!token.isEmpty()) {
+        saveOwnerToken(token);
+    }
+    setRegisteredState(false); // 再登録フラグ
+
     server.send(200, "text/html", "<h1>Saved</h1><p>Rebooting...</p>");
 
     delay(2000);
@@ -384,35 +662,15 @@ bool connectWiFi() {
 }
 
 // ====================
-// Hardware Objects
-// ====================
-
-LEDController statusLED(STATUS_LED);
-LEDController powerLED(POWER_LED);
-
-MotorController vibe1(MOTOR_PWM1);
-MotorController vibe2(MOTOR_PWM2);
-MotorController vibe3(MOTOR_PWM3);
-MotorController vibe4(MOTOR_PWM4);
-MotorController vibe5(MOTOR_PWM5);
-MotorController vibe6(MOTOR_PWM6);
-MotorController vibe7(MOTOR_PWM7);
-MotorController vibe8(MOTOR_PWM8);
-MotorController vibe9(MOTOR_PWM9);
-MotorController vibe10(MOTOR_PWM10);
-
-SensorController sensor(SENSOR_IN);
-ExpandablePinController expand1(EXPAND_PIN1);
-ExpandablePinController expand2(EXPAND_PIN2);
-SwController configResetSw(CONFIG_RESET);
-
-// ====================
 // Setup
 // ====================
 
 void setup() {
     Serial.begin(115200);
     delay(1000);
+
+    // デバイス設定ロード (UUID自動生成/ロード含む)
+    loadDeviceConfig();
 
     powerLED.begin();
     statusLED.begin();
@@ -436,22 +694,23 @@ void setup() {
 
     Serial.println();
     Serial.println("LOC Controller Boot");
+    Serial.println("Device UUID: " + myDeviceUUID);
 
     delay(100);
 
     if (configResetSw.isPressed()) {
-        clearWifi();
-        Serial.println("WiFi Config Cleared");
+        clearWifiAndConfig();
+        Serial.println("WiFi Config & Device Config Cleared");
         delay(500);
 
-        // Long press: BLE mode
+        // 長押し: BLEモード
         delay(2000);
         if (configResetSw.isPressed()) {
             Serial.println("Entering BLE Config Mode");
             startBleConfig();
             return;
         } else {
-            // Web server mode
+            // Webサーバーモード
             Serial.println("Entering Web Config Mode");
             startConfigMode();
             return;
@@ -459,9 +718,14 @@ void setup() {
     }
 
     if (!connectWiFi()) {
-        // Default to BLE config mode
+        // デフォルト: BLE config mode
         Serial.println("No Wi-Fi credentials or connection failed. Starting BLE Config Mode...");
         startBleConfig();
+    } else {
+        // Wi-Fi接続成功時、未登録なら自己登録
+        if (!isRegistered) {
+            registerDevice();
+        }
     }
 }
 
@@ -470,22 +734,32 @@ void setup() {
 // ====================
 
 void loop() {
+    // 振動モーター動作制御 (非ブロッキングで一定時間振動)
+    if (isVibrating) {
+        if (millis() - vibrationStartTime > 5000) { // 5秒間振動
+            setAllMotorsSpeed(0); // モーター停止
+            isVibrating = false;
+            Serial.println("Vibration finished.");
+        }
+    }
+
     if (bleMode) {
-        // Connection tracking and welcoming
+        // BLE接続処理
         if (deviceConnected && !oldDeviceConnected) {
-            delay(500); // Wait for connection to stabilize
+            delay(500); // 接続安定待ち
             blePrintln("LOC Controller - WiFi Configuration");
             blePrintln("Commands:");
             blePrintln("  ssid <name>      - Set WiFi SSID");
             blePrintln("  pass <password>  - Set WiFi Password");
+            blePrintln("  token <token>    - Set OwnerToken");
             blePrintln("  uuid             - Show device identifier UUID");
             blePrintln("  save             - Save and reboot");
             blePrintln("  cancel           - Exit");
             oldDeviceConnected = deviceConnected;
         }
         if (!deviceConnected && oldDeviceConnected) {
-            delay(500); // Give the BLE stack a moment
-            pServer->startAdvertising(); // restart advertising
+            delay(500);
+            pServer->startAdvertising(); // アドバタイズ再開
             Serial.println("Restarted BLE advertising");
             oldDeviceConnected = deviceConnected;
         }
@@ -504,8 +778,15 @@ void loop() {
             lastBlink = millis();
         }
     } else {
+        // 通常動作モード
         statusLED.setState(true);
-        vibe1.setSpeed(128);
+        
+        // サーバーへの定期ポーリング処理
+        if (millis() - lastPollTime >= pollInterval) {
+            pollServer();
+            lastPollTime = millis();
+        }
+        
         delay(10);
     }
 }
