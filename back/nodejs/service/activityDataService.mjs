@@ -1,5 +1,5 @@
 import activityDataRepository from '../repository/activityDataRepository.mjs';
-import crypto from 'crypto';
+import { v7 as uuidV7 } from 'uuid';
 
 const activityDataService = {
   getAllActivityData: async () => {
@@ -25,7 +25,7 @@ const activityDataService = {
 
   createActivityData: async (deviceUuid, type) => {
     try {
-      const newUuid = crypto.randomUUID();
+      const newUuid = uuidV7();
       const newRecord = await activityDataRepository.createActivityData(
         newUuid,
         deviceUuid,

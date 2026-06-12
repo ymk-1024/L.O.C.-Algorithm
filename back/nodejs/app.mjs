@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import routes from './router/index.mjs';
 // [NEW] MySQL データベース接続管理
 import db from './repository/db.mjs';
@@ -22,6 +23,7 @@ await db.initializePool();
 app.use(requestLogger);       // リクエストログ
 app.use(corsMiddleware);       // CORS 有効化
 app.use(express.json());       // JSON パース
+app.use(cookieParser());       // Cookie パース
 app.use(sanitizeBody);         // XSS サニタイズ
 
 app.get('/', (req, res) => {

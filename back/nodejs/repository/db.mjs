@@ -13,9 +13,16 @@ let pool;
 
 // MySQL コネクションプール初期化
 export const initializePool = async () => {
+  const isProductionRuntime = process.env.NODE_ENV === 'production';
+  const envHost = process.env.MYSQL_HOST;
+  const configuredHost = (!isProductionRuntime && envHost === 'mysql')
+    ? '127.0.0.1'
+    : (envHost || (isProductionRuntime ? 'mysql' : '127.0.0.1'));
+  const configuredPort = Number(process.env.MYSQL_PORT || (configuredHost === '127.0.0.1' ? 3307 : 3306));
+
   pool = mysql.createPool({
-    host: process.env.MYSQL_HOST || 'mysql',
-    port: process.env.MYSQL_PORT || 3307,
+    host: configuredHost,
+    port: configuredPort,
     user: process.env.MYSQL_USER || 'admin',
     password: process.env.MYSQL_PASSWORD || '114514',
     database: process.env.MYSQL_DATABASE || 'LOCDB',
