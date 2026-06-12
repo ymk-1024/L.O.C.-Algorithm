@@ -1,5 +1,5 @@
 import deviceRepository from '../repository/deviceRepository.mjs';
-import crypto from 'crypto';
+import { v7 as uuidV7 } from 'uuid';
 
 const deviceService = {
   getAllDevices: async () => {
@@ -25,7 +25,7 @@ const deviceService = {
 
   createDevice: async (userUuid, name, type, status) => {
     try {
-      const newUuid = crypto.randomUUID();
+      const newUuid = uuidV7();
       const newDevice = await deviceRepository.createDevice(
         newUuid,
         userUuid,

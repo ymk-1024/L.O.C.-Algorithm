@@ -23,6 +23,14 @@ export const getUserById = async (uuid) => {
   return results.length > 0 ? results[0] : null;
 };
 
+export const findUserByEmailOrUsername = async (identifier) => {
+  const results = await query(
+    'SELECT uuid, username, email, password, create_at, update_at FROM users WHERE email = ? OR username = ? LIMIT 1',
+    [identifier, identifier]
+  );
+  return results.length > 0 ? results[0] : null;
+};
+
 // ユーザー作成
 export const createUser = async (uuid, username, password, email) => {
   await query(
@@ -46,4 +54,4 @@ export const deleteUser = async (uuid) => {
   await query('DELETE FROM users WHERE uuid = ?', [uuid]);
 };
 
-export default { getAllUsers, getUserById, createUser, updateUser, deleteUser };
+export default { getAllUsers, getUserById, findUserByEmailOrUsername, createUser, updateUser, deleteUser };

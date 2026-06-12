@@ -1,5 +1,5 @@
 import sitDataRepository from '../repository/sitDataRepository.mjs';
-import crypto from 'crypto';
+import { v7 as uuidV7 } from 'uuid';
 
 const normalizeDateTime = (value) => {
   if (value === null || value === undefined || value === '') {
@@ -47,7 +47,7 @@ const sitDataService = {
 
   createSitData: async (deviceUuid, endAt = null) => {
     try {
-      const newUuid = crypto.randomUUID();
+      const newUuid = uuidV7();
       const normalizedEndAt = normalizeDateTime(endAt);
       const newRecord = await sitDataRepository.createSitData(
         newUuid,

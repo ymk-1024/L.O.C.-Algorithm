@@ -2,6 +2,7 @@
 // [UPDATE] db ではなく usersRepository をインポート
 import usersRepository from '../repository/usersRepository.mjs'; 
 import crypto from 'crypto';
+import { v7 as uuidV7 } from 'uuid';
 
 const usersService = {
     // テスト用
@@ -41,10 +42,22 @@ const hashPassword = (password) => {
     return `${salt}:${key}`;
 };
 
+const verifyPassword = (password, storedPassword) => {
+    if (!storedPassword || typeof storedPassword !== 'string') return false;
+
+    if (!storedPassword.includes(':')) {
+        return crypto.timingSafeEqual(Buffer.from(password), Buffer.from(storedPassword));
+    }
+
+    const [salt, expectedHash] = storedPassword.split(':');
+    const derivedKey = crypto.scryptSync(password, salt, 64).toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(expectedHash, 'hex'), Buffer.from(derivedKey, 'hex'));
+};
+
 // ユーザー作成
 usersService.createUser = async (username, password, email) => {
     try {
-        const newUuid = crypto.randomUUID();
+        const newUuid = uuidV7();
         const hashedPassword = hashPassword(password);
         const newUser = await usersRepository.createUser(newUuid, username, hashedPassword, email);
 
@@ -83,6 +96,16 @@ usersService.updateUser = async (uuid, username, password, email) => {
         if (error.code === 'ER_DUP_ENTRY') {
             return { status: 409, message: 'Email already exists' };
         }
+        throw new Error(`DB Error: ${error.message}`);
+    }
+};
+
+usersService.verifyPassword = verifyPassword;
+
+usersService.findUserForLogin = async (identifier) => {
+    try {
+        return await usersRepository.findUserByEmailOrUsername(identifier);
+    } catch (error) {
         throw new Error(`DB Error: ${error.message}`);
     }
 };
