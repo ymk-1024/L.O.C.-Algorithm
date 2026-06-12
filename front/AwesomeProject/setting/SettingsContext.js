@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getApiUrl } from '../utils/api';
+
 
 // -------------------------------------------------------------
 // Centralized Settings Data Structure (Easy to map with API)
@@ -36,28 +38,45 @@ const SettingsContext = createContext(null);
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
 
-  // Mock API Operations
-  // Future implementation: Fetch settings from API on mount
+  // API Operations
   const fetchSettingsFromApi = async () => {
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://api.standupguardian.com';
-      // const response = await fetch(`${apiUrl}/settings`);
-      // const data = await response.json();
-      // setSettings(data);
+      const apiUrl = getApiUrl();
+      const response = await fetch(`${apiUrl}/settings`);
+      if (response.ok) {
+        const resJson = await response.json();
+        // Support both { status: 200, data: { ... } } wrapper and raw settings objects
+        const data = (resJson && resJson.data) ? resJson.data : resJson;
+        
+        if (data && typeof data === 'object') {
+          // Merge fetched settings with initial structure to prevent missing properties
+          setSettings((prev) => ({
+            ...prev,
+            ...data,
+            wifi: { ...prev.wifi, ...(data.wifi || {}) },
+            device: { ...prev.device, ...(data.device || {}) },
+            notifications: { ...prev.notifications, ...(data.notifications || {}) }
+          }));
+        }
+      } else {
+        console.log('API Fetch failed with status:', response.status);
+      }
     } catch (error) {
-      console.log('API Fetch Error:', error);
+      console.log('API Fetch Error (using local settings):', error);
     }
   };
 
-  // Future implementation: Push changes to API
   const saveSettingsToApi = async (updatedSettings) => {
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://api.standupguardian.com';
-      // await fetch(`${apiUrl}/settings`, {
-      //   method: 'PUT',
-      //   body: JSON.stringify(updatedSettings),
-      //   headers: { 'Content-Type': 'application/json' }
-      // });
+      const apiUrl = getApiUrl();
+      const response = await fetch(`${apiUrl}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedSettings),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        console.log('API Save failed with status:', response.status);
+      }
     } catch (error) {
       console.log('API Save Error:', error);
     }
