@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Switch, Alert } from 'react-native';
+import { getApiUrl } from './utils/api';
 import { Ionicons } from '@expo/vector-icons';
 import tw from 'twrnc';
 import { useSettings } from './setting/SettingsContext';
@@ -8,6 +9,52 @@ import BottomMenuBar from './BottomMenuBar';
 
 export default function AccountScreen({ navigation }) {
   const { settings, updateSetting } = useSettings();
+  const [userInfo, setUserInfo] = React.useState({
+    username: '中木 優子',
+    email: 'sone-name@gmail.com',
+  });
+  const [debugInfo, setDebugInfo] = React.useState({
+    url: '',
+    error: null,
+  });
+
+  React.useEffect(() => {
+    const fetchUserInfo = async () => {
+      let resolvedUrl = '';
+      try {
+        const apiUrl = getApiUrl();
+        resolvedUrl = `${apiUrl}/users/user-uuid-1111-2222-3333`;
+        setDebugInfo(prev => ({ ...prev, url: resolvedUrl }));
+
+        const response = await fetch(resolvedUrl);
+        if (response.ok) {
+          const resData = await response.json();
+          if (resData && resData.status === 200 && resData.data) {
+            setUserInfo({
+              username: resData.data.username || '中木 優子',
+              email: resData.data.email || 'sone-name@gmail.com',
+            });
+            setDebugInfo(prev => ({ ...prev, error: null }));
+          } else {
+            setDebugInfo(prev => ({ ...prev, error: `Invalid status: ${resData?.status || 'unknown'}` }));
+          }
+        } else {
+          setDebugInfo(prev => ({ ...prev, error: `HTTP ${response.status}: ${response.statusText || 'Error'}` }));
+        }
+      } catch (error) {
+        console.log('Account API Fetch Error (using fallbacks):', error);
+        setDebugInfo(prev => ({ ...prev, url: resolvedUrl, error: error.message }));
+      }
+    };
+
+    fetchUserInfo();
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchUserInfo();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -49,8 +96,15 @@ export default function AccountScreen({ navigation }) {
             <View style={tw`w-[100px] h-[100px] rounded-full bg-[#E2E8F0] items-center justify-center mb-3 border-4 borderColor-white shadow-sm`}>
               <Ionicons name="person" size={60} color="#7E8B93" />
             </View>
-            <Text style={tw`text-[24px] font-bold text-[#1C1C1E]`}>中木 優子</Text>
-            <Text style={tw`text-[15px] text-[#7E8B93] mt-1`}>sone-name@gmail.com</Text>
+            <Text style={tw`text-[24px] font-bold text-[#1C1C1E]`}>{userInfo.username}</Text>
+            <Text style={tw`text-[15px] text-[#7E8B93] mt-1`}>{userInfo.email}</Text>
+            {/* Debug information overlay */}
+            {debugInfo.error && (
+              <View style={tw`mt-3 p-2 bg-red-50 border border-red-200 rounded-lg w-full`}>
+                <Text style={tw`text-red-600 text-[11px] text-center`}>API Error: {debugInfo.error}</Text>
+                <Text style={tw`text-gray-500 text-[9px] text-center mt-1`}>URL: {debugInfo.url}</Text>
+              </View>
+            )}
           </View>
 
           <View style={tw`h-[1px] bg-[#EAEAEA] mb-2`} />
