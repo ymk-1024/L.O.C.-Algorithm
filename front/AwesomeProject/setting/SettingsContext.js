@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getApiUrl } from '../utils/api';
-
+import { bleManager } from '../utils/bleManager';
 
 // -------------------------------------------------------------
 // Centralized Settings Data Structure (Easy to map with API)
@@ -38,47 +37,25 @@ const SettingsContext = createContext(null);
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
 
-  // API Operations
-  const fetchSettingsFromApi = async () => {
+  // Bluetooth BLE Operations
+  const fetchSettingsFromDevice = async () => {
     try {
-      const apiUrl = getApiUrl();
-      const response = await fetch(`${apiUrl}/settings`);
-      if (response.ok) {
-        const resJson = await response.json();
-        // Support both { status: 200, data: { ... } } wrapper and raw settings objects
-        const data = (resJson && resJson.data) ? resJson.data : resJson;
-        
-        if (data && typeof data === 'object') {
-          // Merge fetched settings with initial structure to prevent missing properties
-          setSettings((prev) => ({
-            ...prev,
-            ...data,
-            wifi: { ...prev.wifi, ...(data.wifi || {}) },
-            device: { ...prev.device, ...(data.device || {}) },
-            notifications: { ...prev.notifications, ...(data.notifications || {}) }
-          }));
-        }
-      } else {
-        console.log('API Fetch failed with status:', response.status);
-      }
+      console.log('[Bluetooth BLE] Reading settings from paired device...');
     } catch (error) {
-      console.log('API Fetch Error (using local settings):', error);
+      console.log('[Bluetooth BLE] Error reading settings:', error);
     }
   };
 
-  const saveSettingsToApi = async (updatedSettings) => {
+  const syncSettingsToDevice = async (updatedSettings) => {
+    const bleState = bleManager.getConnectionState();
+    if (!bleState.isConnected) {
+      console.log('[Bluetooth BLE] Device not connected. Sync skipped.');
+      return;
+    }
     try {
-      const apiUrl = getApiUrl();
-      const response = await fetch(`${apiUrl}/settings`, {
-        method: 'PUT',
-        body: JSON.stringify(updatedSettings),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (!response.ok) {
-        console.log('API Save failed with status:', response.status);
-      }
+      await bleManager.syncSettings(updatedSettings);
     } catch (error) {
-      console.log('API Save Error:', error);
+      console.log('[Bluetooth BLE] Error synchronizing config:', error);
     }
   };
 
@@ -93,15 +70,45 @@ export function SettingsProvider({ children }) {
       }
       current[path[path.length - 1]] = value;
 
-      // Save changes to API in background
-      saveSettingsToApi(newSettings);
+      // Sync updated configuration to BLE hardware
+      syncSettingsToDevice(newSettings);
 
       return newSettings;
     });
   };
 
   useEffect(() => {
-    fetchSettingsFromApi();
+    fetchSettingsFromDevice();
+
+    // Subscribe to BLE connection state changes to dynamically update Context settings state
+    const handleBleStateChange = (bleState) => {
+      if (bleState.isConnected && bleState.device) {
+        setSettings((prev) => ({
+          ...prev,
+          device: {
+            ...prev.device,
+            name: bleState.device.name,
+            status: 'Connected',
+            batteryLevel: bleState.device.batteryLevel,
+            serialNumber: bleState.device.serialNumber,
+            firmwareVersion: bleState.device.firmwareVersion,
+          },
+        }));
+      } else {
+        setSettings((prev) => ({
+          ...prev,
+          device: {
+            ...prev.device,
+            status: 'Disconnected',
+          },
+        }));
+      }
+    };
+
+    bleManager.addListener(handleBleStateChange);
+    return () => {
+      bleManager.removeListener(handleBleStateChange);
+    };
   }, []);
 
   return (

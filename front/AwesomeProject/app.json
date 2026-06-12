@@ -19,6 +19,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "アプリがセンサー端末と通信し設定を同期するためにBluetoothを使用します。"
+        }
+      ]
+    ]
   }
 }
