@@ -76,7 +76,8 @@ usersService.createUser = async (username, password, email) => {
 
 usersService.updateUser = async (uuid, username, password, email) => {
     try {
-        const existingUser = await usersRepository.getUserById(uuid);
+        // password を含む内部クエリで取得
+        const existingUser = await usersRepository.getUserWithPasswordById(uuid);
         if (!existingUser) {
             return { status: 404, message: 'User not found' };
         }

@@ -17,9 +17,15 @@ export const getAllUsers = async () => {
   return await query('SELECT uuid, username, email, create_at, update_at FROM users', []);
 };
 
-// UUID でユーザー取得
+// UUID でユーザー取得（password は含まない - 外部返却用）
 export const getUserById = async (uuid) => {
   const results = await query('SELECT uuid, username, email, create_at, update_at FROM users WHERE uuid = ?', [uuid]);
+  return results.length > 0 ? results[0] : null;
+};
+
+// UUID でユーザー取得（password を含む - 内部処理用）
+export const getUserWithPasswordById = async (uuid) => {
+  const results = await query('SELECT uuid, username, password, email, create_at, update_at FROM users WHERE uuid = ?', [uuid]);
   return results.length > 0 ? results[0] : null;
 };
 
@@ -54,4 +60,4 @@ export const deleteUser = async (uuid) => {
   await query('DELETE FROM users WHERE uuid = ?', [uuid]);
 };
 
-export default { getAllUsers, getUserById, findUserByEmailOrUsername, createUser, updateUser, deleteUser };
+export default { getAllUsers, getUserById, getUserWithPasswordById, findUserByEmailOrUsername, createUser, updateUser, deleteUser };

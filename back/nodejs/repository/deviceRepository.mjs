@@ -33,4 +33,16 @@ export const createDevice = async (uuid, userUuid, name, type, status) => {
   return { uuid, userUuid, name, type, status };
 };
 
-export default { getAllDevices, getDeviceById, createDevice };
+export const updateDevice = async (uuid, name, type, status) => {
+  await query(
+    'UPDATE device SET name = ?, type = ?, status = ? WHERE uuid = ?',
+    [name, type, status, uuid]
+  );
+  return { uuid, name, type, status };
+};
+
+export const deleteDevice = async (uuid) => {
+  await query('DELETE FROM device WHERE uuid = ?', [uuid]);
+};
+
+export default { getAllDevices, getDeviceById, createDevice, updateDevice, deleteDevice };

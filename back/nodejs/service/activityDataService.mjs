@@ -40,6 +40,19 @@ const activityDataService = {
       throw new Error(`DB Error: ${error.message}`);
     }
   },
+
+  deleteActivityData: async (uuid) => {
+    try {
+      const existing = await activityDataRepository.getActivityDataById(uuid);
+      if (!existing) {
+        return { status: 404, message: 'Activity data not found' };
+      }
+      await activityDataRepository.deleteActivityData(uuid);
+      return { status: 200, message: 'Activity data deleted successfully' };
+    } catch (error) {
+      throw new Error(`DB Error: ${error.message}`);
+    }
+  },
 };
 
 export default activityDataService;

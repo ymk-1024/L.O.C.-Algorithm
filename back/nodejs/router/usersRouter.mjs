@@ -1,20 +1,19 @@
 import { Router } from "express";
 import usersHandler from "../handler/usersHandler.mjs";
-// [NEW] 検証ミドルウェア
 import { validateUserCreation } from "../middleware/validationMiddleware.mjs";
+import authMiddleware from "../middleware/authMiddleware.mjs";
 
 const user = Router();
 
 user.get('/test', usersHandler.test);
-// [NEW] GET / - 全ユーザー取得
+
+// 読み取り系：認証不要
 user.get('/', usersHandler.getAllUsers);
-// [NEW] GET /:uuid - UUID でユーザー取得
 user.get('/:uuid', usersHandler.getUserById);
-// [NEW] POST / - ユーザー作成（username, password, email のみ必須。uuid はサーバー側で自動生成）
-user.post('/', validateUserCreation, usersHandler.createUser);
-// [NEW] PUT /:uuid - ユーザー更新
-user.put('/:uuid', usersHandler.updateUser);
-// [NEW] DELETE /:uuid - ユーザー削除
-user.delete('/:uuid', usersHandler.deleteUser);
+
+// 書き込み系：JWT 認証必須
+user.post('/',        validateUserCreation, usersHandler.createUser);  // 新規登録は認証不要
+user.put('/:uuid',   authMiddleware.autoRefreshAuth, usersHandler.updateUser);
+user.delete('/:uuid', authMiddleware.autoRefreshAuth, usersHandler.deleteUser);
 
 export default user;
