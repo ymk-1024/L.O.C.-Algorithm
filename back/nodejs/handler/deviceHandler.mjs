@@ -36,8 +36,34 @@ const createDevice = async (req, res, next) => {
   }
 };
 
+const updateDevice = async (req, res, next) => {
+  try {
+    const uuid   = sanitize(req.params.uuid);
+    const name   = sanitize(req.body.name);
+    const type   = sanitize(req.body.type);
+    const status = sanitize(req.body.status);
+
+    const result = await deviceService.updateDevice(uuid, name, type, status);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteDevice = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const result = await deviceService.deleteDevice(uuid);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   getAllDevices,
   getDeviceById,
   createDevice,
+  updateDevice,
+  deleteDevice,
 };

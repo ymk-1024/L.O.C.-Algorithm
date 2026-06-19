@@ -26,9 +26,17 @@ const setTokenCookie = (res, token, name) => {
   });
 };
 
+// Cookie または Authorization: Bearer ヘッダーからトークンを取得
+const extractAccessToken = (req) => {
+  if (req.cookies?.access_token) return req.cookies.access_token;
+  const auth = req.headers?.authorization;
+  if (auth && auth.startsWith('Bearer ')) return auth.slice(7);
+  return null;
+};
+
 const verifyCookie = async (req, res, next) => {
   try {
-    const token = req.cookies?.access_token;
+    const token = extractAccessToken(req);
     if (!token) {
       return res.status(401).json({ status: 401, message: '認証情報が不足しています。' });
     }
@@ -73,7 +81,9 @@ const verifyRefreshToken = async (req, res, next) => {
 
 const autoRefreshAuth = async (req, res, next) => {
   try {
-    const accessToken = req.cookies?.access_token;
+    // Cookie 優先、なければ Authorization ヘッダーから取得
+    const accessToken = req.cookies?.access_token
+      || (() => { const a = req.headers?.authorization; return a?.startsWith('Bearer ') ? a.slice(7) : null; })();
     const refreshToken = req.cookies?.refresh_token;
 
     if (accessToken) {
