@@ -45,4 +45,12 @@ export const deleteDevice = async (uuid) => {
   await query('DELETE FROM device WHERE uuid = ?', [uuid]);
 };
 
-export default { getAllDevices, getDeviceById, createDevice, updateDevice, deleteDevice };
+export const selfRegisterDevice = async (uuid, userUuid, name, model) => {
+  await query(
+    'INSERT INTO device (uuid, user_uuid, name, model, type, status) VALUES (?, ?, ?, ?, ?, ?)',
+    [uuid, userUuid, name, model || null, 'unknown', 'active']
+  );
+  return { uuid, userUuid, name, model };
+};
+
+export default { getAllDevices, getDeviceById, createDevice, updateDevice, deleteDevice, selfRegisterDevice };
