@@ -12,6 +12,7 @@ import HomeScreen from './Home';
 import Setting from './Setting';
 import AccountScreen from './Account';
 import ScheduleScreen from './Schedule';
+import RecordsScreen from './Records';
 
 const Stack = createNativeStackNavigator();
 
@@ -30,6 +31,7 @@ function App() {
           <Stack.Screen name="Settings" component={Setting} />
           <Stack.Screen name="Account" component={AccountScreen} />
           <Stack.Screen name="Schedule" component={ScheduleScreen} />
+          <Stack.Screen name="Records" component={RecordsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       </SettingsProvider>
