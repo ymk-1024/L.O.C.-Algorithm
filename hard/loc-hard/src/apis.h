@@ -82,6 +82,7 @@ inline String generateNonce() {
 // 共通ヘッダを付与したHTTP/HTTPSリクエストの送信
 inline bool sendApiRequest(const String& path, const String& method, const String& payload, String& response) {
     if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[API Error] WiFi not connected. Cannot send request.");
         return false;
     }
 
@@ -113,6 +114,18 @@ inline bool sendApiRequest(const String& path, const String& method, const Strin
         http.addHeader("Authorization", "Bearer " + myOwnerToken);
     }
 
+    Serial.println("----------------------------------------");
+    Serial.printf("[API Request] %s %s\n", method.c_str(), url.c_str());
+    Serial.printf("  X-Nonce: %s\n", nonce.c_str());
+    Serial.printf("  X-Timestamp: %s\n", timestamp.c_str());
+    Serial.printf("  X-Device-UUID: %s\n", myDeviceUUID.c_str());
+    if (!myOwnerToken.isEmpty()) {
+        Serial.printf("  Authorization: Bearer %s\n", myOwnerToken.c_str());
+    }
+    if (!payload.isEmpty()) {
+        Serial.printf("  Payload: %s\n", payload.c_str());
+    }
+
     if (method == "POST") {
         httpCode = http.POST(payload);
     } else if (method == "GET") {
@@ -123,11 +136,14 @@ inline bool sendApiRequest(const String& path, const String& method, const Strin
 
     if (httpCode > 0) {
         response = http.getString();
-        Serial.printf("[HTTP] %s to %s response: %d\n", method.c_str(), path.c_str(), httpCode);
+        Serial.printf("[API Response] HTTP Code: %d\n", httpCode);
+        Serial.printf("  Response Body: %s\n", response.c_str());
+        Serial.println("----------------------------------------");
         http.end();
         return (httpCode >= 200 && httpCode < 300);
     } else {
-        Serial.printf("[HTTP] %s failed, error: %s\n", method.c_str(), http.errorToString(httpCode).c_str());
+        Serial.printf("[API Response] Request failed, HTTP Code/Error: %s (%d)\n", http.errorToString(httpCode).c_str(), httpCode);
+        Serial.println("----------------------------------------");
         http.end();
         return false;
     }
@@ -165,7 +181,7 @@ inline void pollServer(int seatState) {
         return;
     }
 
-    Serial.println("Polling server for events...");
+    Serial.printf("Polling server for events (Seat State: %d)...\n", seatState);
     
     // ポーリングパス。現在の着座状態をクエリパラメータとして送信
     String path = "/api/v1.0/sit_data?status=" + String(seatState);

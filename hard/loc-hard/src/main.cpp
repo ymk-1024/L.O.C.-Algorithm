@@ -505,21 +505,28 @@ bool connectWiFi() {
     String ssid = loadSSID();
     String pass = loadPassword();
 
-    if (ssid.isEmpty())
+    if (ssid.isEmpty()) {
+        Serial.println("[WiFi] No SSID configured.");
         return false;
+    }
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), pass.c_str());
+    Serial.printf("[WiFi] Connecting to SSID: %s ", ssid.c_str());
 
     unsigned long startTime = millis();
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        if (millis() - startTime > 15000)
+        Serial.print(".");
+        if (millis() - startTime > 15000) {
+            Serial.println("\n[WiFi] Connection timeout.");
             return false;
+        }
     }
 
-    Serial.println("WiFi Connected");
+    Serial.println("\n[WiFi] Connected successfully.");
+    Serial.print("[WiFi] IP Address: ");
     Serial.println(WiFi.localIP());
     return true;
 }
@@ -667,9 +674,17 @@ void loop() {
             registerDevice();
         }
         
+        // 着座状態の変化を監視しログ出力
+        static int lastSeatState = -1;
+        int currentSeatState = sensor.readValue();
+        if (currentSeatState != lastSeatState) {
+            Serial.printf("[State Change] Seat State changed from %d to %d\n", lastSeatState, currentSeatState);
+            lastSeatState = currentSeatState;
+        }
+        
         // サーバーへの定期ポーリング処理
         if (millis() - lastPollTime >= pollInterval) {
-            pollServer(sensor.readValue());
+            pollServer(currentSeatState);
             lastPollTime = millis();
         }
         
