@@ -42,6 +42,7 @@ const colors = {
 const SCHEDULE_EVENTS_EVEN = [
   // 月曜
   { dayIndex: 0, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
+  { dayIndex: 0, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green2' }, // 重なりテスト
   { dayIndex: 0, rowIndex: 6, hours: 3, time: '12:00 - 15:00', type: 'green3' },
   { dayIndex: 0, rowIndex: 9, hours: 4, time: '18:00 - 22:00', type: 'green4' },
   
@@ -82,6 +83,7 @@ const SCHEDULE_EVENTS_ODD = [
   // 水曜〜金曜
   { dayIndex: 2, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
   { dayIndex: 3, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
+  { dayIndex: 3, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' }, // 重なりテスト
   { dayIndex: 4, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
 
   { dayIndex: 2, rowIndex: 7, hours: 2, time: '14:00 - 16:00', type: 'green1' },
@@ -147,7 +149,88 @@ export default function Schedule({ navigation }) {
 
   const weekTime = currentWeekStart.getTime();
   const isEvenWeek = Math.floor(weekTime / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
-  const events = isEvenWeek ? SCHEDULE_EVENTS_EVEN : SCHEDULE_EVENTS_ODD;
+  const rawEvents = isEvenWeek ? SCHEDULE_EVENTS_EVEN : SCHEDULE_EVENTS_ODD;
+
+  // 同時間帯の予定重なり（衝突）を判定し、横並びにするレイアウト計算
+  const processOverlaps = (eventsList) => {
+    const daysEvents = Array.from({ length: 7 }, () => []);
+    eventsList.forEach((e) => {
+      const rowSpan = Math.max(1, Math.round(e.hours / 2));
+      daysEvents[e.dayIndex].push({
+        ...e,
+        rowSpan,
+        startRow: e.rowIndex,
+        endRow: e.rowIndex + rowSpan,
+        overlapIndex: 0,
+        overlapCount: 1,
+      });
+    });
+
+    daysEvents.forEach((dayEvents) => {
+      if (dayEvents.length === 0) return;
+
+      // 1. 開始時間が早い順、次に期間が長い（終了時間が遅い）順にソート
+      dayEvents.sort((a, b) => {
+        if (a.startRow !== b.startRow) {
+          return a.startRow - b.startRow;
+        }
+        return b.rowSpan - a.rowSpan;
+      });
+
+      // 2. 衝突するイベントをグループ（接続成分）に分ける
+      const groups = [];
+      dayEvents.forEach((event) => {
+        let placed = false;
+        for (let g of groups) {
+          const overlapsAny = g.some((ge) => {
+            return event.startRow < ge.endRow && ge.startRow < event.endRow;
+          });
+          if (overlapsAny) {
+            g.push(event);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          groups.push([event]);
+        }
+      });
+
+      // 3. 各グループ内で、イベントをサブカラム（トラック）に割り当てる
+      groups.forEach((group) => {
+        const columns = []; // 各要素はイベントの配列（その列に配置されたもの）
+
+        group.forEach((event) => {
+          let colIndex = -1;
+          for (let i = 0; i < columns.length; i++) {
+            const lastEventInCol = columns[i][columns[i].length - 1];
+            if (lastEventInCol.endRow <= event.startRow) {
+              colIndex = i;
+              break;
+            }
+          }
+
+          if (colIndex !== -1) {
+            columns[colIndex].push(event);
+          } else {
+            columns.push([event]);
+            colIndex = columns.length - 1;
+          }
+
+          event.overlapIndex = colIndex;
+        });
+
+        const maxCols = columns.length;
+        group.forEach((event) => {
+          event.overlapCount = maxCols;
+        });
+      });
+    });
+
+    return daysEvents.flat();
+  };
+
+  const events = processOverlaps(rawEvents);
 
   return (
     <View style={tw`flex-1 bg-[#F7F9FB]`}>
@@ -261,9 +344,13 @@ export default function Schedule({ navigation }) {
                   {/* スケジュールカード (Absolute レイヤー) */}
                   {events.map((event, index) => {
                     const colorScheme = colors[event.type] || colors.green1;
-                    const rowSpan = Math.max(1, Math.round(event.hours / 2));
+                    const rowSpan = event.rowSpan || 1;
                     // 幅が広くなったので ' - ' を ' ~ ' に置き換えて見やすく折り返し
                     const displayTime = event.time.replace(' - ', '\n~ ');
+
+                    // 重なり（衝突）数に応じて横幅を等分割する
+                    const cardColWidth = (colWidth - 4) / event.overlapCount;
+                    const cardLeft = event.dayIndex * colWidth + 2 + event.overlapIndex * cardColWidth;
 
                     return (
                       <TouchableOpacity
@@ -272,12 +359,12 @@ export default function Schedule({ navigation }) {
                         style={[
                           tw`rounded-[8px] absolute flex-row overflow-hidden border border-black/5`,
                           {
-                            left: event.dayIndex * colWidth + 2,
+                            left: cardLeft,
                             top: event.rowIndex * cardHeight + 2,
-                            width: colWidth - 4, // 横は1日分に固定
+                            width: cardColWidth - 2, // 等分された幅に設定
                             height: rowSpan * cardHeight - 4,
                             backgroundColor: colorScheme.bg,
-                            zIndex: 10,
+                            zIndex: 10 + event.overlapIndex,
                           }
                         ]}
                       >
