@@ -7,13 +7,13 @@
 @baseUrl = http://localhost:3005/api/v1.0
 
 ### ▼ UUIDをここに記録して使い回す（実行後に手動で書き換える）
-@userUuid    = 
-@deviceUuid  = 
+@userUuid    = 019ef217-a372-73e9-91d8-debec49d5f18
+@deviceUuid  = デバイスが自分で生成したUUID
 @sitUuid     = 
 @actUuid     = 
 
 ### ▼ 2-1ログイン後にレスポンスの accessToken をここに貼る
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTllZGRjYi1kZWM1LTcyOGQtOTU2Yi1mZjk3ZTAyMzYyMjUiLCJpYXQiOjE3ODE4Mzc2MjMsImV4cCI6MTc4MTgzOTQyM30.ppMqfaf-i2UhdHBZ9NXqpKb2inhzuPhnmfQvGuStO7c
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTllZjIxNy1hMzcyLTczZTktOTFkOC1kZWJlYzQ5ZDVmMTgiLCJpYXQiOjE3ODIxNzgxODksImV4cCI6MTc4MjE3OTk4OX0.KwrDk53fTH1ivQzExOEmln_xhXHv28WZJTtYj7USfz8
 ### ===================================================
 ### 0. サーバー疎通確認
 ### ===================================================
@@ -204,3 +204,28 @@ GET {{baseUrl}}/activity_data/{{actUuid}}
 ### 5-4. 活動データ削除（要認証）
 DELETE {{baseUrl}}/activity_data/{{actUuid}}
 Authorization: Bearer {{accessToken}}
+
+
+
+### OwnerToken 発行（App が叩く）
+POST http://localhost:3005/api/v1.0/device/issue-token
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "deviceUuid": "デバイスが自分で生成したUUID",
+  "name": "センサー1号"
+}
+
+### デバイス自己登録（マイコンが叩く）
+POST http://localhost:3005/api/v1.0/device/self-register
+Content-Type: application/json
+Authorization: OwnerToken eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTllZjIxNy1hMzcyLTczZTktOTFkOC1kZWJlYzQ5ZDVmMTgiLCJkZXZpY2VfdXVpZCI6IuODh-ODkOOCpOOCueOBjOiHquWIhuOBp-eUn-aIkOOBl-OBn1VVSUQiLCJ0eXBlIjoib3duZXIiLCJpYXQiOjE3ODIxNzgyNDQsImV4cCI6MTc4NDc3MDI0NH0.TDjZN0jQmgCGtOyKH8gO4XKP28_DYKob-faPNMUIoiU
+
+{
+  "model": "LOC-v1"
+}
+
+### OwnerToken 更新（マイコンが叩く）
+POST http://localhost:3005/api/v1.0/device/token/refresh
+Authorization: OwnerToken eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTllZjIxNy1hMzcyLTczZTktOTFkOC1kZWJlYzQ5ZDVmMTgiLCJkZXZpY2VfdXVpZCI6IuODh-ODkOOCpOOCueOBjOiHquWIhuOBp-eUn-aIkOOBl-OBn1VVSUQiLCJ0eXBlIjoib3duZXIiLCJpYXQiOjE3ODIxNzgyNDQsImV4cCI6MTc4NDc3MDI0NH0.TDjZN0jQmgCGtOyKH8gO4XKP28_DYKob-faPNMUIoiU

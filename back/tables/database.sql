@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS `device` (
     `uuid` VARCHAR(255) NOT NULL PRIMARY KEY,
     `user_uuid` VARCHAR(255) NOT NULL,
     `name` VARCHAR(255) NOT NULL,
-    `type` VARCHAR(255) NOT NULL,
-    `status` VARCHAR(255) NOT NULL,
+    `model` VARCHAR(255) DEFAULT NULL,
+    `type` VARCHAR(255) NOT NULL DEFAULT 'unknown',
+    `status` VARCHAR(255) NOT NULL DEFAULT 'active',
     `create_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `update_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_uuid) REFERENCES users(uuid) ON DELETE CASCADE
@@ -46,3 +47,18 @@ CREATE TABLE IF NOT EXISTS `refresh_tokens` (
     CONSTRAINT fk_user_uuid FOREIGN KEY (user_uuid) REFERENCES users(uuid) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS `owner_tokens` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_uuid` VARCHAR(255) NOT NULL,
+    `device_uuid` VARCHAR(255) NOT NULL,
+    `name` VARCHAR(255) NOT NULL DEFAULT 'Unknown Device',
+    `token` VARCHAR(512) NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `expires_at` TIMESTAMP NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `unique_owner_token` (`token`),
+    UNIQUE KEY `unique_owner_device` (`device_uuid`),
+    INDEX `idx_owner_token_user` (`user_uuid`),
+    CONSTRAINT `fk_owner_token_user`
+        FOREIGN KEY (`user_uuid`) REFERENCES `users`(`uuid`) ON DELETE CASCADE
+);
