@@ -151,81 +151,76 @@ export default function Schedule({ navigation }) {
   const isEvenWeek = Math.floor(weekTime / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
   const rawEvents = isEvenWeek ? SCHEDULE_EVENTS_EVEN : SCHEDULE_EVENTS_ODD;
 
-  // 同時間帯の予定重なり（衝突）を判定し、横並びにするレイアウト計算
-  // 同時間帯の予定重なり（衝突）を判定し、横並びにするレイアウト計算
+  // 同時間帯の予定重なり（衝突）をマージし、1つの機能オフ時間帯としてまとめるレイアウト計算
   const processOverlaps = (eventsList) => {
     const daysEvents = Array.from({ length: 7 }, () => []);
     eventsList.forEach((e) => {
-      const startRow = Number(e.rowIndex);
+      const rowIndex = Number(e.rowIndex);
       const hours = Number(e.hours);
-      const rowSpan = Math.max(1, Math.round(hours / 2));
+      const startMin = rowIndex * 120;
+      const endMin = startMin + hours * 60;
       daysEvents[e.dayIndex].push({
         ...e,
-        rowSpan,
-        startRow,
-        endRow: startRow + rowSpan,
-        overlapIndex: 0,
-        overlapCount: 1,
+        startMin,
+        endMin,
+        rowIndex,
+        hours,
       });
     });
 
     daysEvents.forEach((dayEvents) => {
       if (dayEvents.length === 0) return;
 
-      // 1. 開始時間が早い順、次に期間が長い（終了時間が遅い）順にソート
+      // 1. 開始分が早い順、次に終了分が遅い順にソート
       dayEvents.sort((a, b) => {
-        if (a.startRow !== b.startRow) {
-          return a.startRow - b.startRow;
+        if (a.startMin !== b.startMin) {
+          return a.startMin - b.startMin;
         }
-        return b.rowSpan - a.rowSpan;
+        return b.endMin - a.endMin;
       });
 
-      // 2. 衝突するイベントをグループ（接続成分）に分ける
-      const groups = [];
+      // 2. 重なる時間帯（インターバル）をマージする
+      const merged = [];
       dayEvents.forEach((event) => {
-        let placed = false;
-        for (let g of groups) {
-          const overlapsAny = g.some((ge) => {
-            return event.startRow < ge.endRow && ge.startRow < event.endRow;
-          });
-          if (overlapsAny) {
-            g.push(event);
-            placed = true;
-            break;
+        if (merged.length === 0) {
+          merged.push({ ...event });
+        } else {
+          const last = merged[merged.length - 1];
+          if (event.startMin < last.endMin) {
+            // 重なりがあるためマージ（終了時刻を最大値に更新）
+            last.endMin = Math.max(last.endMin, event.endMin);
+            last.hours = (last.endMin - last.startMin) / 60;
+          } else {
+            merged.push({ ...event });
           }
-        }
-        if (!placed) {
-          groups.push([event]);
         }
       });
 
-      // 3. 各グループ内で、イベントをサブカラム（トラック）に割り当てる
-      groups.forEach((group) => {
-        const columns = []; // 各要素はイベントの配列（その列に配置されたもの）
+      // 3. マージされたイベントの描画用パラメータを再設定
+      dayEvents.length = 0;
+      merged.forEach((event) => {
+        const rowSpan = Math.max(1, Math.round(event.hours / 2));
+        const startHour = Math.floor(event.startMin / 60);
+        const startMinPart = event.startMin % 60;
+        const endHour = Math.floor(event.endMin / 60);
+        const endMinPart = event.endMin % 60;
 
-        group.forEach((event) => {
-          let colIndex = -1;
-          for (let i = 0; i < columns.length; i++) {
-            const lastEventInCol = columns[i][columns[i].length - 1];
-            if (lastEventInCol.endRow <= event.startRow) {
-              colIndex = i;
-              break;
-            }
-          }
+        const pad = (num) => String(num).padStart(2, '0');
+        const timeStr = `${pad(startHour)}:${pad(startMinPart)} - ${pad(endHour)}:${pad(endMinPart)}`;
 
-          if (colIndex !== -1) {
-            columns[colIndex].push(event);
-          } else {
-            columns.push([event]);
-            colIndex = columns.length - 1;
-          }
+        // 何時間何分オフにするのかの表示テキストを作成
+        const h = Math.floor(event.hours);
+        const m = Math.round((event.hours - h) * 60);
+        const durationText = m > 0 ? `${h}時間${m}分` : `${h}時間`;
 
-          event.overlapIndex = colIndex;
-        });
-
-        const maxCols = columns.length;
-        group.forEach((event) => {
-          event.overlapCount = maxCols;
+        dayEvents.push({
+          ...event,
+          rowSpan,
+          rowIndex: event.startMin / 120,
+          time: timeStr,
+          durationText, // 合計時間テキスト
+          overlapIndex: 0,
+          overlapCount: 1, // マージされたので重なりは常に1
         });
       });
     });
@@ -376,24 +371,22 @@ export default function Schedule({ navigation }) {
                         
                         {/* 時刻表示 */}
                         <View style={tw`flex-1 justify-center items-center p-[2px]`}>
-                          {rowSpan > 1 && (
-                            <Text
-                              style={[
-                                tw`font-bold text-center mb-[2px] opacity-80`,
-                                {
-                                  fontSize: 9,
-                                  color: colorScheme.text,
-                                }
-                              ]}
-                            >
-                              {event.hours}時間
-                            </Text>
-                          )}
                           <Text
                             style={[
-                              tw`font-bold text-center leading-[11px]`,
+                              tw`font-bold text-center mb-[2px]`,
                               {
-                                fontSize: rowSpan > 1 ? 10 : 8,
+                                fontSize: rowSpan > 1 ? 11 : 9,
+                                color: colorScheme.text,
+                              }
+                            ]}
+                          >
+                            {event.durationText}
+                          </Text>
+                          <Text
+                            style={[
+                              tw`font-semibold text-center leading-[10px] opacity-75`,
+                              {
+                                fontSize: rowSpan > 1 ? 9 : 8,
                                 color: colorScheme.text,
                               }
                             ]}
