@@ -1,20 +1,106 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Switch, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Switch, Alert, ActivityIndicator, Modal, TextInput, Platform, PermissionsAndroid } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import tw from 'twrnc';
 import { useSettings } from './SettingsContext';
 import DetailHeader from './DetailHeader';
+import { bleManager, addKnownSsid, getKnownSsids } from '../utils/bleManager';
 
 export default function WifiSettingScreen({ navigation }) {
   const { settings, updateSetting } = useSettings();
 
-  const availableNetworks = [
-    { ssid: 'Office-Guest-Wi-Fi', secure: true, signal: 3 },
-    { ssid: 'Home-Router-2G', secure: true, signal: 2 },
-    { ssid: 'Free-Public-WiFi', secure: false, signal: 4 },
-  ];
+  const [networks, setNetworks] = useState([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isConnectedDevice, setIsConnectedDevice] = useState(false);
+  
+  // Custom manual Wi-Fi input states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [customSsid, setCustomSsid] = useState('');
+  const [customPassword, setCustomPassword] = useState('');
 
-  const savedNetworks = ['StandUpGuardian_5G', 'Office-Guest-Wi-Fi', 'Home-Router-2G'];
+  useEffect(() => {
+    const checkConnection = (bleState) => {
+      setIsConnectedDevice(bleState.isConnected);
+    };
+    bleManager.addListener(checkConnection);
+    return () => {
+      bleManager.removeListener(checkConnection);
+    };
+  }, []);
+
+  const requestLocationPermission = async () => {
+    if (Platform.OS !== 'android') return true;
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: '位置情報アクセスの許可',
+          message: '周辺のWi-Fiネットワークを検索するために位置情報の許可が必要です。',
+          buttonNeutral: '後で',
+          buttonNegative: '拒否',
+          buttonPositive: '許可',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  };
+
+  const triggerWifiScan = async () => {
+    const state = bleManager.getConnectionState();
+    if (!state.isConnected) {
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        Alert.alert('権限エラー', '位置情報の権限が拒否されたため、Wi-Fiスキャンを実行できません。');
+        return;
+      }
+    }
+    
+    setIsScanning(true);
+    setNetworks([]);
+    try {
+      const scanResult = await bleManager.scanWifi();
+      setNetworks(scanResult);
+    } catch (error) {
+      console.warn('[Wi-Fi Scan Error]', error);
+      Alert.alert('スキャン失敗', `Wi-Fiスキャンに失敗しました: ${error.message}`);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (settings.wifi.enabled && isConnectedDevice) {
+      triggerWifiScan();
+    } else {
+      setNetworks([]);
+    }
+  }, [settings.wifi.enabled, isConnectedDevice]);
+
+  const getSavedNetworksList = () => {
+    const list = [];
+    getKnownSsids().forEach((ssid) => {
+      if (ssid && !list.includes(ssid)) {
+        list.push(ssid);
+      }
+    });
+    if (settings.wifi.connectedSsid && !list.includes(settings.wifi.connectedSsid)) {
+      list.push(settings.wifi.connectedSsid);
+    }
+    networks.forEach((net) => {
+      if (net.ssid && !list.includes(net.ssid)) {
+        list.push(net.ssid);
+      }
+    });
+    return list;
+  };
+  const savedNetworks = getSavedNetworksList();
   const delays = [
     { value: 0, label: 'なし' },
     { value: 5, label: '5秒' },
@@ -32,6 +118,44 @@ export default function WifiSettingScreen({ navigation }) {
         },
       },
     ]);
+  };
+
+  const handleConnectCustom = async () => {
+    if (!customSsid) {
+      Alert.alert('入力エラー', 'SSIDを入力してください。');
+      return;
+    }
+    
+    // Register the custom SSID to bleManager's dynamic scan results list
+    addKnownSsid(customSsid);
+    
+    // Update Context settings state
+    updateSetting(['wifi', 'connectedSsid'], customSsid);
+    
+    // Perform BLE sync including custom password
+    const state = bleManager.getConnectionState();
+    if (state.isConnected) {
+      const syncPayload = {
+        ...settings,
+        wifi: {
+          ...settings.wifi,
+          connectedSsid: customSsid,
+          password: customPassword || '', // Inject password for sync test
+        }
+      };
+      
+      try {
+        await bleManager.syncSettings(syncPayload);
+        Alert.alert('送信成功', `Wi-Fi設定（SSID: ${customSsid}）をデバイスに流し込みました。`);
+      } catch (e) {
+        console.warn('[Custom Wifi Sync Error]', e);
+        Alert.alert('送信失敗', `設定の流し込みに失敗しました: ${e.message}`);
+      }
+    }
+    
+    setShowAddModal(false);
+    setCustomSsid('');
+    setCustomPassword('');
   };
 
   return (
@@ -84,30 +208,70 @@ export default function WifiSettingScreen({ navigation }) {
             </View>
 
             {/* Available Networks Card */}
-            <Text style={tw`text-[16px] font-bold text-[#7E8B93] mb-2 ml-2`}>利用可能なネットワーク</Text>
+            <View style={tw`flex-row items-center justify-between mb-2 ml-2 mr-1`}>
+              <Text style={tw`text-[16px] font-bold text-[#7E8B93]`}>利用可能なネットワーク</Text>
+              {settings.wifi.enabled && isConnectedDevice && !isScanning && (
+                <TouchableOpacity onPress={triggerWifiScan}>
+                  <Ionicons name="refresh" size={18} color="#1E3D37" />
+                </TouchableOpacity>
+              )}
+            </View>
+
             <View style={tw`bg-white rounded-[20px] p-5 mb-4 shadow-sm`}>
-              {availableNetworks.map((net, index) => {
-                const isLast = index === availableNetworks.length - 1;
-                return (
-                  <TouchableOpacity
-                    key={net.ssid}
-                    style={tw`flex-row items-center justify-between py-[18px] ${!isLast ? 'border-b border-[#EAEAEA]' : ''}`}
-                    onPress={() => handleConnect(net.ssid)}
-                  >
-                    <View style={tw`flex-row items-center`}>
-                      <Ionicons
-                        name={net.secure ? 'lock-closed-outline' : 'globe-outline'}
-                        size={18}
-                        color="#8E8E93"
-                      />
-                      <Text style={tw`text-[18px] text-[#1C1C1E] ml-[10px]`}>{net.ssid}</Text>
-                    </View>
-                    <View style={tw`justify-center`}>
-                      <Ionicons name="wifi" size={18} color="#8E8E93" />
-                    </View>
+              {!isConnectedDevice ? (
+                <View style={tw`items-center py-4`}>
+                  <Ionicons name="bluetooth-outline" size={30} color="#8E8E93" style={tw`mb-2`} />
+                  <Text style={tw`text-[14px] text-[#8E8E93] text-center px-4 leading-5`}>
+                    Wi-Fiスキャンを実行するには、まず「デバイス管理」でセンサーに接続してください。
+                  </Text>
+                </View>
+              ) : isScanning ? (
+                <View style={tw`items-center py-6`}>
+                  <ActivityIndicator size="small" color="#1E3D37" />
+                  <Text style={tw`text-[13px] text-[#1E3D37] mt-2 font-medium`}>周辺のWi-Fiを検索中...</Text>
+                </View>
+              ) : networks.length === 0 ? (
+                <View style={tw`items-center py-4`}>
+                  <Text style={tw`text-[14px] text-[#8E8E93] mb-3`}>ネットワークが見つかりませんでした。</Text>
+                  <TouchableOpacity style={tw`bg-[#1E3D37] px-4 py-2 rounded-[10px]`} onPress={triggerWifiScan}>
+                    <Text style={tw`text-white text-[12px] font-bold`}>再スキャン</Text>
                   </TouchableOpacity>
-                );
-              })}
+                </View>
+              ) : (
+                networks.map((net, index) => {
+                  const isLast = index === networks.length - 1;
+                  return (
+                    <TouchableOpacity
+                      key={net.ssid}
+                      style={tw`flex-row items-center justify-between py-[18px] ${!isLast ? 'border-b border-[#EAEAEA]' : ''}`}
+                      onPress={() => handleConnect(net.ssid)}
+                    >
+                      <View style={tw`flex-row items-center`}>
+                        <Ionicons
+                          name={net.secure ? 'lock-closed-outline' : 'globe-outline'}
+                          size={18}
+                          color="#8E8E93"
+                        />
+                        <Text style={tw`text-[18px] text-[#1C1C1E] ml-[10px]`}>{net.ssid}</Text>
+                      </View>
+                      <View style={tw`justify-center`}>
+                        <Ionicons name="wifi" size={18} color="#8E8E93" />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
+              {isConnectedDevice && !isScanning && (
+                <TouchableOpacity
+                  style={tw`flex-row items-center justify-center py-4 border-t border-[#F2F2F7] mt-2`}
+                  onPress={() => setShowAddModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add-circle-outline" size={20} color="#1E3D37" />
+                  <Text style={tw`text-[#1E3D37] text-[15px] font-bold ml-2`}>その他のネットワークを追加...</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Integrated Auto-Connect Settings Card */}
@@ -132,21 +296,27 @@ export default function WifiSettingScreen({ navigation }) {
                 <View style={tw`mt-4 pt-4 border-t border-[#F2F2F7]`}>
                   {/* Preferred Network Selector */}
                   <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-3`}>最優先接続ネットワーク</Text>
-                  {savedNetworks.map((net, index) => {
-                    const isLast = index === savedNetworks.length - 1;
-                    return (
-                      <TouchableOpacity
-                        key={net}
-                        style={tw`flex-row items-center justify-between py-3 ${!isLast ? 'border-b border-[#F2F2F7]' : ''}`}
-                        onPress={() => updateSetting(['wifi', 'preferredSsid'], net)}
-                      >
-                        <Text style={tw`text-[16px] text-[#1C1C1E]`}>{net}</Text>
-                        {settings.wifi.preferredSsid === net && (
-                          <Ionicons name="checkmark" size={18} color="#1E3D37" />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {savedNetworks.length === 0 ? (
+                    <Text style={tw`text-[13px] text-[#8E8E93] py-2 leading-5`}>
+                      接続履歴またはスキャンされたネットワークがありません。先にスキャンや手動追加を行ってください。
+                    </Text>
+                  ) : (
+                    savedNetworks.map((net, index) => {
+                      const isLast = index === savedNetworks.length - 1;
+                      return (
+                        <TouchableOpacity
+                          key={net}
+                          style={tw`flex-row items-center justify-between py-3 ${!isLast ? 'border-b border-[#F2F2F7]' : ''}`}
+                          onPress={() => updateSetting(['wifi', 'preferredSsid'], net)}
+                        >
+                          <Text style={tw`text-[16px] text-[#1C1C1E]`}>{net}</Text>
+                          {settings.wifi.preferredSsid === net && (
+                            <Ionicons name="checkmark" size={18} color="#1E3D37" />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
 
                   {/* Delay selector */}
                   <Text style={tw`text-[14px] font-bold text-[#7E8B93] mt-4 mb-3`}>接続遅延設定</Text>
@@ -169,6 +339,63 @@ export default function WifiSettingScreen({ navigation }) {
           </View>
         )}
       </ScrollView>
+
+      {/* Manual Wifi Add Modal */}
+      <Modal
+        visible={showAddModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={tw`flex-1 justify-center items-center bg-black/50 px-6`}>
+          <View style={tw`bg-white rounded-[24px] w-full p-6 shadow-xl`}>
+            <View style={tw`flex-row justify-between items-center mb-5`}>
+              <Text style={tw`text-[20px] font-bold text-[#1C1C1E]`}>ネットワークを手動追加</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <Ionicons name="close" size={24} color="#8E8E93" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-2`}>ネットワーク名 (SSID)</Text>
+            <TextInput
+              style={tw`bg-[#F2F2F7] rounded-[12px] p-3 text-[16px] mb-4 text-[#1C1C1E]`}
+              placeholder="SSIDを入力してください"
+              placeholderTextColor="#8E8E93"
+              value={customSsid}
+              onChangeText={setCustomSsid}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-2`}>パスワード</Text>
+            <TextInput
+              style={tw`bg-[#F2F2F7] rounded-[12px] p-3 text-[16px] mb-6 text-[#1C1C1E]`}
+              placeholder="パスワードを入力してください"
+              placeholderTextColor="#8E8E93"
+              secureTextEntry={true}
+              value={customPassword}
+              onChangeText={setCustomPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={tw`flex-row justify-between`}>
+              <TouchableOpacity
+                style={tw`flex-1 bg-[#F2F2F7] py-3 rounded-[14px] mr-2 items-center`}
+                onPress={() => setShowAddModal(false)}
+              >
+                <Text style={tw`text-[#8E8E93] text-[15px] font-bold`}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={tw`flex-1 bg-[#1E3D37] py-3 rounded-[14px] ml-2 items-center`}
+                onPress={handleConnectCustom}
+              >
+                <Text style={tw`text-white text-[15px] font-bold`}>接続・流し込み</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

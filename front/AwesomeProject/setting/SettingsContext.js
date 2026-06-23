@@ -17,7 +17,7 @@ const INITIAL_SETTINGS = {
   sensorSensitivity: 'Medium', // 'Low' | 'Medium' | 'High'
   device: {
     name: process.env.EXPO_PUBLIC_DEFAULT_DEVICE_NAME || 'SG-Sensor-X1',
-    status: 'Connected',
+    status: 'Disconnected',
     batteryLevel: 82,
     serialNumber: 'SN-98231B-G',
     firmwareVersion: 'v' + (process.env.EXPO_PUBLIC_APP_VERSION || '1.2.4'),

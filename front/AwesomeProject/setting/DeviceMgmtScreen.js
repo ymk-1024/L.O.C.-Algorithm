@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import tw from 'twrnc';
 import { useSettings } from './SettingsContext';
 import DetailHeader from './DetailHeader';
-import { bleManager } from '../utils/bleManager';
+import { bleManager, setVirtualMode, getIsVirtualMode } from '../utils/bleManager';
 
 export default function DeviceMgmtScreen({ navigation }) {
   const { settings } = useSettings();
@@ -15,8 +15,7 @@ export default function DeviceMgmtScreen({ navigation }) {
 
   // Sync virtual/physical state on mount
   useEffect(() => {
-    const state = bleManager.getConnectionState();
-    setIsVirtualMode(state.isVirtual);
+    setIsVirtualMode(getIsVirtualMode());
   }, []);
 
 
@@ -84,14 +83,24 @@ export default function DeviceMgmtScreen({ navigation }) {
       <DetailHeader title="デバイス管理" onBack={() => { stopScan(); navigation.goBack(); }} />
       <ScrollView contentContainerStyle={tw`px-5 pb-10`}>
         
-        {/* Connection Mode Ribbon Banner */}
-        <View style={tw`mb-4 py-2 px-3 rounded-lg ${isVirtualMode ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+        {/* Connection Mode Ribbon Banner (Interactive Toggle for Testing) */}
+        <TouchableOpacity 
+          style={tw`mb-4 py-3 px-3 rounded-xl ${isVirtualMode ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}
+          onPress={() => {
+            const nextMode = !isVirtualMode;
+            setVirtualMode(nextMode);
+            setIsVirtualMode(nextMode);
+            bleManager.disconnect();
+            setDiscoveredDevices([]);
+          }}
+          activeOpacity={0.7}
+        >
           <Text style={tw`text-center text-[12px] font-semibold ${isVirtualMode ? 'text-amber-700' : 'text-emerald-700'}`}>
             {isVirtualMode 
-              ? '⚠️ 仮想BLEモード動作中 (シミュレーション)' 
-              : '⚡ 実機Bluetooth LE (react-native-ble-plx) 動作中'}
+              ? '⚠️ 仮想BLEモード (タップして実機スキャンに切り替え)' 
+              : '⚡ 実機Bluetooth LE (タップして仮想スキャンに切り替え)'}
           </Text>
-        </View>
+        </TouchableOpacity>
 
         {isConnected ? (
           /* Paired Device Status View */

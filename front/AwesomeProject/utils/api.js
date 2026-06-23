@@ -26,9 +26,9 @@ export const getApiUrl = () => {
       }
     }
     
-    // Android Emulator fallback
+    // Android fallback: use 127.0.0.1 so adb reverse works on physical devices (Bridgeless mode)
     if (host === 'localhost' && Platform.OS === 'android') {
-      host = '10.0.2.2';
+      host = '127.0.0.1';
     }
     
     return `http://${host}:3005/api/v1.0`;

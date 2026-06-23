@@ -1,11 +1,16 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
 
 export default function DetailHeader({ title, onBack }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={tw`flex-row items-center justify-between px-4 py-3 bg-[#F7F9FB]`}>
+    <View style={[
+      tw`flex-row items-center justify-between px-4 pb-3 bg-[#F7F9FB]`,
+      { paddingTop: Math.max(insets.top, 12) }
+    ]}>
       <TouchableOpacity 
         style={tw`w-10 h-10 rounded-full bg-white items-center justify-center shadow-sm`} 
         onPress={onBack} 

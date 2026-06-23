@@ -1,11 +1,16 @@
 import React from 'react';
 import { View, Text, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
 
 export default function AppHeader() {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={tw`px-6 pb-3 bg-[#F7F9FB] ${Platform.OS === 'android' ? 'pt-4' : 'pt-3'}`}>
+    <View style={[
+      tw`px-6 pb-3 bg-[#F7F9FB]`,
+      { paddingTop: Math.max(insets.top, 12) }
+    ]}>
       <View style={tw`flex-row items-center`}>
         <View style={tw`relative justify-center items-center mr-[10px]`}>
           <Ionicons name="shield" size={36} color="#7E8B93" />

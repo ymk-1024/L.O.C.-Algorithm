@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
 
 export default function BottomMenuBar({ activeTab, navigation }) {
@@ -29,8 +30,13 @@ export default function BottomMenuBar({ activeTab, navigation }) {
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={tw`relative bg-white border-t border-[#EAEAEA] pb-5 pt-2 flex-row justify-around items-center shadow-lg`}>
+    <View style={[
+      tw`relative bg-white border-t border-[#EAEAEA] pt-2 flex-row justify-around items-center shadow-lg`,
+      { paddingBottom: Math.max(insets.bottom, 16) }
+    ]}>
       {items.map((item) => {
         const isActive = activeTab === item.id;
         const iconName = isActive ? item.icon : item.iconOutline;
