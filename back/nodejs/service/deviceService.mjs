@@ -1,4 +1,5 @@
 import deviceRepository from '../repository/deviceRepository.mjs';
+import ownerTokenService from './ownerTokenService.mjs';
 import { v7 as uuidV7 } from 'uuid';
 
 const deviceService = {
@@ -76,6 +77,48 @@ const deviceService = {
     } catch (error) {
       throw new Error(`DB Error: ${error.message}`);
     }
+  },
+
+  // App → サーバー: OwnerToken 発行申請
+  issueOwnerToken: async (userUuid, deviceUuid, name) => {
+    return await ownerTokenService.issueOwnerToken(userUuid, deviceUuid, name);
+  },
+
+  // デバイス → サーバー: 自己登録
+  selfRegister: async (token, model) => {
+    try {
+      // OwnerToken から登録情報を取得
+      const info = await ownerTokenService.getSelfRegisterInfo(token);
+      if (!info) {
+        return { status: 401, message: 'OwnerToken が無効です。' };
+      }
+
+      // すでに登録済みか確認
+      const existing = await deviceRepository.getDeviceById(info.deviceUuid);
+      if (existing) {
+        return { status: 409, message: 'このデバイスはすでに登録されています。', data: existing };
+      }
+
+      const device = await deviceRepository.selfRegisterDevice(
+        info.deviceUuid,
+        info.userUuid,
+        info.name,
+        model || null
+      );
+
+      return {
+        status: 201,
+        message: 'デバイスを登録しました。',
+        data: device,
+      };
+    } catch (error) {
+      throw new Error(`DB Error: ${error.message}`);
+    }
+  },
+
+  // デバイス → サーバー: OwnerToken 更新
+  refreshOwnerToken: async (currentToken) => {
+    return await ownerTokenService.refreshOwnerToken(currentToken);
   },
 };
 
