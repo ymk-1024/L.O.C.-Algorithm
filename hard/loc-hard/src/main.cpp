@@ -717,14 +717,21 @@ void setup() {
         }
     }
 
-    if (!connectWiFi()) {
-        // デフォルト: BLE config mode
-        Serial.println("No Wi-Fi credentials or connection failed. Starting BLE Config Mode...");
+    String ssid = loadSSID();
+    if (ssid.isEmpty()) {
+        // 設定がない場合はBLEモードで設定を待つ
+        Serial.println("No Wi-Fi credentials. Starting BLE Config Mode...");
         startBleConfig();
     } else {
-        // Wi-Fi接続成功時、未登録なら自己登録
-        if (!isRegistered) {
-            registerDevice();
+        // 設定がある場合はWi-Fi接続を試みる
+        Serial.println("Wi-Fi credentials found. Connecting...");
+        if (!connectWiFi()) {
+            Serial.println("Initial Wi-Fi connection failed. Proceeding to normal mode to retry in background.");
+        } else {
+            // Wi-Fi接続成功時、未登録なら自己登録
+            if (!isRegistered) {
+                registerDevice();
+            }
         }
     }
 }
@@ -780,6 +787,11 @@ void loop() {
     } else {
         // 通常動作モード
         statusLED.setState(true);
+        
+        // 未登録かつWi-Fi接続済みの場合は自己登録を試みる
+        if (WiFi.status() == WL_CONNECTED && !isRegistered) {
+            registerDevice();
+        }
         
         // サーバーへの定期ポーリング処理
         if (millis() - lastPollTime >= pollInterval) {
