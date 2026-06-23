@@ -8,6 +8,7 @@ const INITIAL_SETTINGS = {
   wifi: {
     enabled: false,
     connectedSsid: '',
+    password: '',
     autoConnect: false,
     preferredSsid: '',
     delaySeconds: 5,

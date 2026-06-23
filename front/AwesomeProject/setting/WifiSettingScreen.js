@@ -17,6 +17,7 @@ export default function WifiSettingScreen({ navigation }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [customSsid, setCustomSsid] = useState('');
   const [customPassword, setCustomPassword] = useState('');
+  const [isManualAdd, setIsManualAdd] = useState(true);
 
   useEffect(() => {
     const checkConnection = (bleState) => {
@@ -109,15 +110,10 @@ export default function WifiSettingScreen({ navigation }) {
   ];
 
   const handleConnect = (ssid) => {
-    Alert.alert('ネットワーク接続', `${ssid} に接続しますか？`, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '接続',
-        onPress: () => {
-          updateSetting(['wifi', 'connectedSsid'], ssid);
-        },
-      },
-    ]);
+    setCustomSsid(ssid);
+    setCustomPassword('');
+    setIsManualAdd(false);
+    setShowAddModal(true);
   };
 
   const handleConnectCustom = async () => {
@@ -129,28 +125,19 @@ export default function WifiSettingScreen({ navigation }) {
     // Register the custom SSID to bleManager's dynamic scan results list
     addKnownSsid(customSsid);
     
-    // Update Context settings state
-    updateSetting(['wifi', 'connectedSsid'], customSsid);
+    // Update Context settings state (which triggers BLE synchronization internally)
+    const updatedWifi = {
+      ...settings.wifi,
+      connectedSsid: customSsid,
+      password: customPassword || '',
+    };
     
-    // Perform BLE sync including custom password
-    const state = bleManager.getConnectionState();
-    if (state.isConnected) {
-      const syncPayload = {
-        ...settings,
-        wifi: {
-          ...settings.wifi,
-          connectedSsid: customSsid,
-          password: customPassword || '', // Inject password for sync test
-        }
-      };
-      
-      try {
-        await bleManager.syncSettings(syncPayload);
-        Alert.alert('送信成功', `Wi-Fi設定（SSID: ${customSsid}）をデバイスに流し込みました。`);
-      } catch (e) {
-        console.warn('[Custom Wifi Sync Error]', e);
-        Alert.alert('送信失敗', `設定の流し込みに失敗しました: ${e.message}`);
-      }
+    try {
+      updateSetting(['wifi'], updatedWifi);
+      Alert.alert('送信成功', `Wi-Fi設定（SSID: ${customSsid}）をデバイスに流し込みました。`);
+    } catch (e) {
+      console.warn('[Wifi Sync Error]', e);
+      Alert.alert('送信失敗', `設定の流し込みに失敗しました: ${e.message}`);
     }
     
     setShowAddModal(false);
@@ -265,7 +252,10 @@ export default function WifiSettingScreen({ navigation }) {
               {isConnectedDevice && !isScanning && (
                 <TouchableOpacity
                   style={tw`flex-row items-center justify-center py-4 border-t border-[#F2F2F7] mt-2`}
-                  onPress={() => setShowAddModal(true)}
+                  onPress={() => {
+                    setIsManualAdd(true);
+                    setShowAddModal(true);
+                  }}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="add-circle-outline" size={20} color="#1E3D37" />
@@ -350,7 +340,9 @@ export default function WifiSettingScreen({ navigation }) {
         <View style={tw`flex-1 justify-center items-center bg-black/50 px-6`}>
           <View style={tw`bg-white rounded-[24px] w-full p-6 shadow-xl`}>
             <View style={tw`flex-row justify-between items-center mb-5`}>
-              <Text style={tw`text-[20px] font-bold text-[#1C1C1E]`}>ネットワークを手動追加</Text>
+              <Text style={tw`text-[20px] font-bold text-[#1C1C1E]`}>
+                {isManualAdd ? 'ネットワークを手動追加' : 'ネットワークに接続'}
+              </Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
                 <Ionicons name="close" size={24} color="#8E8E93" />
               </TouchableOpacity>
@@ -358,13 +350,17 @@ export default function WifiSettingScreen({ navigation }) {
 
             <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-2`}>ネットワーク名 (SSID)</Text>
             <TextInput
-              style={tw`bg-[#F2F2F7] rounded-[12px] p-3 text-[16px] mb-4 text-[#1C1C1E]`}
+              style={[
+                tw`rounded-[12px] p-3 text-[16px] mb-4`,
+                isManualAdd ? tw`bg-[#F2F2F7] text-[#1C1C1E]` : tw`bg-[#E5E5EA] text-[#8E8E93]`
+              ]}
               placeholder="SSIDを入力してください"
               placeholderTextColor="#8E8E93"
               value={customSsid}
               onChangeText={setCustomSsid}
               autoCapitalize="none"
               autoCorrect={false}
+              editable={isManualAdd}
             />
 
             <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-2`}>パスワード</Text>
