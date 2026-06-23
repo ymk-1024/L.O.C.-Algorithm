@@ -100,23 +100,18 @@ export default function Schedule({ navigation }) {
   const insets = useSafeAreaInsets();
   const headerScrollRef = useRef(null);
   const gridScrollRef = useRef(null);
-  const isScrollingHeader = useRef(false);
-  const isScrollingGrid = useRef(false);
+  const activeScrollSource = useRef(null); // 'header', 'grid', または null
 
   const handleGridScroll = (event) => {
-    if (isScrollingHeader.current) return;
-    isScrollingGrid.current = true;
+    if (activeScrollSource.current === 'header') return;
     const x = event.nativeEvent.contentOffset.x;
     headerScrollRef.current?.scrollTo({ x, animated: false });
-    isScrollingGrid.current = false;
   };
 
   const handleHeaderScroll = (event) => {
-    if (isScrollingGrid.current) return;
-    isScrollingHeader.current = true;
+    if (activeScrollSource.current === 'grid') return;
     const x = event.nativeEvent.contentOffset.x;
     gridScrollRef.current?.scrollTo({ x, animated: false });
-    isScrollingHeader.current = false;
   };
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
@@ -294,6 +289,10 @@ export default function Schedule({ navigation }) {
             showsHorizontalScrollIndicator={false}
             scrollEventThrottle={16}
             onScroll={handleHeaderScroll}
+            onScrollBeginDrag={() => { activeScrollSource.current = 'header'; }}
+            onMomentumScrollBegin={() => { activeScrollSource.current = 'header'; }}
+            onScrollEndDrag={() => { activeScrollSource.current = null; }}
+            onMomentumScrollEnd={() => { activeScrollSource.current = null; }}
             contentContainerStyle={{ width: colWidth * 7 }}
           >
             <View style={tw`flex-row border-b border-[#F2F2F7] pb-3 mb-1`}>
@@ -346,6 +345,10 @@ export default function Schedule({ navigation }) {
                 showsHorizontalScrollIndicator={false}
                 scrollEventThrottle={16}
                 onScroll={handleGridScroll}
+                onScrollBeginDrag={() => { activeScrollSource.current = 'grid'; }}
+                onMomentumScrollBegin={() => { activeScrollSource.current = 'grid'; }}
+                onScrollEndDrag={() => { activeScrollSource.current = null; }}
+                onMomentumScrollEnd={() => { activeScrollSource.current = null; }}
                 contentContainerStyle={{ width: colWidth * 7 }}
               >
                 {/* グリッド本体 (背景破線枠 + absoluteイベント) */}
