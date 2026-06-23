@@ -27,7 +27,7 @@
 #define CONFIG_RESET   13
 
 // バックエンドサーバーのベースURL (実環境に合わせて変更可能)
-#define BACKEND_BASE_URL "http://192.168.1.100:3000" 
+#define BACKEND_BASE_URL "http://localhost:3000" 
 
 const int freq = 5000;
 const int resolution = 8;
