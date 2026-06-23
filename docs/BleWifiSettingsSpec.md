@@ -103,6 +103,7 @@ graph TD
 | `pass` | `<Password>`| 接続する Wi-Fi のパスワードをメモリ上に一時保持します。 |
 | `token`| `<Token>` | サーバー認証用 `OwnerToken` をメモリ上に一時保持します。 |
 | `uuid` | なし | 現在のデバイス固有 UUID を TX 特性から返却します。 |
+| `owner`| なし | 現在メモリ上に一時保持されている（または保存済みの） `OwnerUUID` (`OwnerToken`) を TX 特性から返却します。 |
 | `save` | なし | 一時保持している情報を `Preferences` に書き込み、登録ステータスを `unregistered` (未登録) にリセットした上で、1秒後にデバイスを再起動 (`ESP.restart()`) します。<br>※ SSIDが未入力の場合はエラーとなります。 |
 | `cancel`| なし | 設定を保存せず、デバイスを再起動します。 |
 
@@ -127,10 +128,11 @@ PCやスマートフォンからデバイスのローカルアクセスポイン
 #### ① 設定画面の取得
 - **パス**: `GET /`
 - **レスポンス**: HTMLドキュメント（設定入力フォーム）
+  - **初期値の補完 (Prefill)**: すでに `Preferences` に保存されている SSID と OwnerToken の値が、それぞれ入力フィールドの初期値（`value` 属性）として自動で設定されます。
   - 入力項目:
     - **SSID** (`ssid`): 接続先 Wi-Fi の SSID
     - **Password** (`password`): 接続先 Wi-Fi のパスワード
-    - **OwnerToken (Server Auth)** (`token`): サーバー認証用 `OwnerToken`
+    - **OwnerToken (Server Auth)** (`token`): サーバー認証用 `OwnerToken` (OwnerUUIDとして使用)
   
 #### ② 設定値の保存と再起動
 - **パス**: `POST /save`

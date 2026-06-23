@@ -556,6 +556,9 @@ void processBleCommand(const String& input) {
         ESP.restart();
     } else if (input == "uuid") {
         blePrintln("UUID: " + myDeviceUUID);
+    } else if (input == "owner") {
+        String currentOwner = bleOwnerToken.isEmpty() ? myOwnerToken : bleOwnerToken;
+        blePrintln("Owner UUID: " + currentOwner);
     } else {
         blePrintln("Unknown command: " + input);
     }
@@ -589,7 +592,10 @@ OwnerToken (Server Auth)<br>
 )rawliteral";
 
 void handleRoot() {
-    server.send(200, "text/html", configPage);
+    String html = String(configPage);
+    html.replace("name=\"ssid\"", "name=\"ssid\" value=\"" + loadSSID() + "\"");
+    html.replace("name=\"token\"", "name=\"token\" value=\"" + myOwnerToken + "\"");
+    server.send(200, "text/html", html);
 }
 
 void handleSave() {
@@ -695,6 +701,7 @@ void setup() {
     Serial.println();
     Serial.println("LOC Controller Boot");
     Serial.println("Device UUID: " + myDeviceUUID);
+    Serial.println("Owner UUID: " + myOwnerToken);
 
     delay(100);
 
@@ -760,6 +767,7 @@ void loop() {
             blePrintln("  pass <password>  - Set WiFi Password");
             blePrintln("  token <token>    - Set OwnerToken");
             blePrintln("  uuid             - Show device identifier UUID");
+            blePrintln("  owner            - Show owner UUID");
             blePrintln("  save             - Save and reboot");
             blePrintln("  cancel           - Exit");
             oldDeviceConnected = deviceConnected;
