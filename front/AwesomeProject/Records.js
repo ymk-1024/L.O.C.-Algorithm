@@ -16,11 +16,11 @@ const { width } = Dimensions.get('window');
 const marginHorizontal = 16;
 const CARD_PADDING = 20; // 左右パディング
 const CHART_WIDTH = width - marginHorizontal * 2 - CARD_PADDING * 2; // グラフの横幅
-const CHART_HEIGHT = 160; // グラフの高さ
+const CHART_HEIGHT = 140; // グラフの高さ
 
 // グラフデータ（Jan〜Aug）
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
-const BAR_VALUES = [50, 95, 60, 85, 130, 90, 115, 95]; // 棒グラフの高さ
+const BAR_VALUES = [50, 95, 60, 85, 100, 90, 115, 95]; // 棒グラフの高さ
 
 export default function RecordScreen({ navigation }) {
   const isFocused = useIsFocused();
@@ -54,22 +54,21 @@ export default function RecordScreen({ navigation }) {
                 <Defs>
                   {/* アースカラー調の縦グラデーション */}
                   <LinearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                    <Stop offset="0%" stopColor="#3B5E4F" />
-                    <Stop offset="50%" stopColor="#5A8296" />
-                    <Stop offset="100%" stopColor="#8E6B82" />
+                    <Stop offset="0%" stopColor="#389f76b5" />
+                    <Stop offset="100%" stopColor="#175c47b3" />
                   </LinearGradient>
                 </Defs>
 
                 {/* Y軸 */}
-                <Line x1="15" y1="10" x2="15" y2="130" stroke="#CBD5E1" strokeWidth="2" />
+                <Line x1="15" y1="10" x2="15" y2="130" stroke="#777777" strokeWidth="2" />
                 {/* X軸 */}
-                <Line x1="15" y1="130" x2={CHART_WIDTH - 5} y2="130" stroke="#CBD5E1" strokeWidth="2" />
+                <Line x1="15" y1="130" x2={CHART_WIDTH - 5} y2="130" stroke="#777777" strokeWidth="2" />
 
                 {/* 棒グラフの描画 */}
                 {BAR_VALUES.map((val, index) => {
-                  const barWidth = 16;
+                  const barWidth = 15;
                   const spacing = (CHART_WIDTH - 30) / 8;
-                  const x = 25 + index * spacing + spacing / 2; // 中央揃えの補正
+                  const x = 19 + index * spacing + spacing / 2; // 中央揃えの補正
                   const y = 130 - val; // 130 から引くことで底辺に合わせる
                   return (
                     <Rect
