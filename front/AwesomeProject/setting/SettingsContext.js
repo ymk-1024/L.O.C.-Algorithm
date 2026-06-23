@@ -22,6 +22,8 @@ const INITIAL_SETTINGS = {
     batteryLevel: 82,
     serialNumber: 'SN-98231B-G',
     firmwareVersion: 'v' + (process.env.EXPO_PUBLIC_APP_VERSION || '1.2.4'),
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXZpY2UtMTExMS0yMjIyLTMzMzMiLCJvd25lciI6Im1hdHR5IiwiaWF0IjoxNzE4NzczNjAwfQ.dummy_signature_jwt_token_placeholder_value',
+    registered: false,
   },
   notifications: {
     enabled: true,
