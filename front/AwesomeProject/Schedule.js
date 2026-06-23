@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
@@ -98,6 +98,26 @@ const SCHEDULE_EVENTS_ODD = [
 
 export default function Schedule({ navigation }) {
   const insets = useSafeAreaInsets();
+  const headerScrollRef = useRef(null);
+  const gridScrollRef = useRef(null);
+  const isScrollingHeader = useRef(false);
+  const isScrollingGrid = useRef(false);
+
+  const handleGridScroll = (event) => {
+    if (isScrollingHeader.current) return;
+    isScrollingGrid.current = true;
+    const x = event.nativeEvent.contentOffset.x;
+    headerScrollRef.current?.scrollTo({ x, animated: false });
+    isScrollingGrid.current = false;
+  };
+
+  const handleHeaderScroll = (event) => {
+    if (isScrollingGrid.current) return;
+    isScrollingHeader.current = true;
+    const x = event.nativeEvent.contentOffset.x;
+    gridScrollRef.current?.scrollTo({ x, animated: false });
+    isScrollingHeader.current = false;
+  };
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
@@ -151,7 +171,6 @@ export default function Schedule({ navigation }) {
   const isEvenWeek = Math.floor(weekTime / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
   const rawEvents = isEvenWeek ? SCHEDULE_EVENTS_EVEN : SCHEDULE_EVENTS_ODD;
 
-  // 同時間帯の予定重なり（衝突）をマージし、1つの機能オフ時間帯としてまとめるレイアウト計算
   const processOverlaps = (eventsList) => {
     const daysEvents = Array.from({ length: 7 }, () => []);
     eventsList.forEach((e) => {
@@ -171,7 +190,6 @@ export default function Schedule({ navigation }) {
     daysEvents.forEach((dayEvents) => {
       if (dayEvents.length === 0) return;
 
-      // 1. 開始分が早い順、次に終了分が遅い順にソート
       dayEvents.sort((a, b) => {
         if (a.startMin !== b.startMin) {
           return a.startMin - b.startMin;
@@ -179,7 +197,6 @@ export default function Schedule({ navigation }) {
         return b.endMin - a.endMin;
       });
 
-      // 2. 重なる時間帯（インターバル）をマージする
       const merged = [];
       dayEvents.forEach((event) => {
         if (merged.length === 0) {
@@ -187,7 +204,6 @@ export default function Schedule({ navigation }) {
         } else {
           const last = merged[merged.length - 1];
           if (event.startMin < last.endMin) {
-            // 重なりがあるためマージ（終了時刻を最大値に更新）
             last.endMin = Math.max(last.endMin, event.endMin);
             last.hours = (last.endMin - last.startMin) / 60;
           } else {
@@ -196,7 +212,6 @@ export default function Schedule({ navigation }) {
         }
       });
 
-      // 3. マージされたイベントの描画用パラメータを再設定
       dayEvents.length = 0;
       merged.forEach((event) => {
         const rowSpan = Math.max(1, Math.round(event.hours / 2));
@@ -208,7 +223,6 @@ export default function Schedule({ navigation }) {
         const pad = (num) => String(num).padStart(2, '0');
         const timeStr = `${pad(startHour)}:${pad(startMinPart)} - ${pad(endHour)}:${pad(endMinPart)}`;
 
-        // 何時間何分オフにするのかの表示テキストを作成
         const h = Math.floor(event.hours);
         const m = Math.round((event.hours - h) * 60);
         const durationText = m > 0 ? `${h}時間${m}分` : `${h}時間`;
@@ -218,9 +232,9 @@ export default function Schedule({ navigation }) {
           rowSpan,
           rowIndex: event.startMin / 120,
           time: timeStr,
-          durationText, // 合計時間テキスト
+          durationText,
           overlapIndex: 0,
-          overlapCount: 1, // マージされたので重なりは常に1
+          overlapCount: 1,
         });
       });
     });
@@ -234,14 +248,10 @@ export default function Schedule({ navigation }) {
     <View style={tw`flex-1 bg-[#F7F9FB]`}>
       <AppHeader />
 
-      <ScrollView contentContainerStyle={tw`px-[${marginHorizontal}px] pb-6`}>
-        {/* Title Banner */}
-        <View style={tw`bg-[#EAF6F3] rounded-[20px] py-4 px-6 mb-4 items-center`}>
-          <Text style={tw`text-[26px] font-bold text-[#1E3D37]`}>スケジュール</Text>
-        </View>
-
+      {/* 縦にスクロールしない上部エリア */}
+      <View style={tw`px-[${marginHorizontal}px] pt-2 pb-1`}>
         {/* Week Navigation */}
-        <View style={tw`flex-row justify-between items-center mb-4 px-2`}>
+        <View style={tw`flex-row justify-between items-center mb-3 px-2`}>
           <TouchableOpacity
             onPress={() => changeWeek(-1)}
             style={tw`bg-[#1E3D37]/10 w-9 h-9 rounded-full items-center justify-center`}
@@ -249,16 +259,19 @@ export default function Schedule({ navigation }) {
             <Text style={tw`text-[#1E3D37] font-bold text-[18px]`}>‹</Text>
           </TouchableOpacity>
 
-          <View style={tw`flex-row items-center gap-3`}>
-            <Text style={tw`text-[18px] font-bold text-[#1C1C1E]`}>
-              {getYearMonthLabel()}
-            </Text>
-            <TouchableOpacity
-              onPress={setTodayWeek}
-              style={tw`bg-[#1E3D37] px-3 py-1 rounded-full`}
-            >
-              <Text style={tw`text-white text-[12px] font-bold`}>今日</Text>
-            </TouchableOpacity>
+          <View style={tw`items-center`}>
+            <Text style={tw`text-[10px] font-bold text-[#1E3D37]/60 tracking-wider mb-[2px]`}>SCHEDULE</Text>
+            <View style={tw`flex-row items-center gap-3`}>
+              <Text style={tw`text-[18px] font-bold text-[#1C1C1E]`}>
+                {getYearMonthLabel()}
+              </Text>
+              <TouchableOpacity
+                onPress={setTodayWeek}
+                style={tw`bg-[#1E3D37] px-3 py-1 rounded-full`}
+              >
+                <Text style={tw`text-white text-[12px] font-bold`}>今日</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -269,51 +282,72 @@ export default function Schedule({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Schedule Grid Box */}
-        <View style={tw`bg-white rounded-[24px] p-3 shadow-sm border border-[#EAEAEA]`}>
+        {/* カレンダーヘッダーボックス (曜日のみ、縦に固定され横スクロール可能) */}
+        <View style={tw`bg-white rounded-t-[24px] pt-4 px-3 border-t border-l border-r border-[#EAEAEA] flex-row`}>
+          {/* 左端の余白 (時間軸ラベル幅分) */}
+          <View style={{ width: timeColWidth }} />
           
-          <View style={tw`flex-row`}>
-            {/* 左端: 固定時間軸ラベル */}
-            <View style={{ width: timeColWidth, paddingTop: 46 }}>
-              <View style={{ justifyContent: 'space-between', height: cardHeight * TIME_LABELS.length, paddingVertical: 4 }}>
-                {TIME_LABELS.map((label, index) => (
-                  <View key={index} style={{ height: cardHeight, justifyContent: 'flex-start' }}>
-                    <Text style={tw`text-[11px] font-semibold text-[#8E8E93] text-right pr-2`}>
-                      {label}
+          {/* 曜日ヘッダー用の横スクロールビュー */}
+          <ScrollView
+            ref={headerScrollRef}
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={handleHeaderScroll}
+            contentContainerStyle={{ width: colWidth * 7 }}
+          >
+            <View style={tw`flex-row border-b border-[#F2F2F7] pb-3 mb-1`}>
+              {getDays().map((day) => (
+                <View key={day.key} style={{ width: colWidth, alignItems: 'center' }}>
+                  <Text style={tw`text-[13px] font-medium text-[#7E8B93] mb-1`}>{day.label}</Text>
+                  <View style={[
+                    tw`w-7 h-7 rounded-full items-center justify-center`,
+                    day.isToday && tw`bg-[#1E3D37]`
+                  ]}>
+                    <Text style={[
+                      tw`text-[15px] font-bold`,
+                      day.isToday ? tw`text-white` : tw`text-[#1C1C1E]`
+                    ]}>
+                      {day.date}
                     </Text>
                   </View>
-                ))}
-              </View>
+                </View>
+              ))}
             </View>
+          </ScrollView>
+        </View>
+      </View>
 
-            {/* 右側: 横スクロール可能なスケジュールグリッド */}
-            <ScrollView
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ width: colWidth * 7 }}
-            >
-              <View style={{ flex: 1 }}>
-                
-                {/* 曜日ヘッダー */}
-                <View style={tw`flex-row border-b border-[#F2F2F7] pb-3 mb-2`}>
-                  {getDays().map((day) => (
-                    <View key={day.key} style={{ width: colWidth, alignItems: 'center' }}>
-                      <Text style={tw`text-[13px] font-medium text-[#7E8B93] mb-1`}>{day.label}</Text>
-                      <View style={[
-                        tw`w-7 h-7 rounded-full items-center justify-center`,
-                        day.isToday && tw`bg-[#1E3D37]`
-                      ]}>
-                        <Text style={[
-                          tw`text-[15px] font-bold`,
-                          day.isToday ? tw`text-white` : tw`text-[#1C1C1E]`
-                        ]}>
-                          {day.date}
-                        </Text>
-                      </View>
+      {/* 縦にスクロールするグリッド本体エリア */}
+      <View style={tw`flex-1 px-[${marginHorizontal}px] pb-6`}>
+        <View style={tw`flex-1 bg-white rounded-b-[24px] pb-3 px-3 border-b border-l border-r border-[#EAEAEA]`}>
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ pb: 16 }}
+          >
+            <View style={tw`flex-row`}>
+              {/* 左端: 固定時間軸ラベル */}
+              <View style={{ width: timeColWidth, paddingTop: 4 }}>
+                <View style={{ justifyContent: 'space-between', height: cardHeight * TIME_LABELS.length, paddingVertical: 4 }}>
+                  {TIME_LABELS.map((label, index) => (
+                    <View key={index} style={{ height: cardHeight, justifyContent: 'flex-start' }}>
+                      <Text style={tw`text-[11px] font-semibold text-[#8E8E93] text-right pr-2`}>
+                        {label}
+                      </Text>
                     </View>
                   ))}
                 </View>
+              </View>
 
+              {/* 右側: 横スクロール可能なスケジュールグリッド */}
+              <ScrollView
+                ref={gridScrollRef}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={handleGridScroll}
+                contentContainerStyle={{ width: colWidth * 7 }}
+              >
                 {/* グリッド本体 (背景破線枠 + absoluteイベント) */}
                 <View style={{ height: cardHeight * TIME_LABELS.length, position: 'relative' }}>
                   
@@ -343,10 +377,8 @@ export default function Schedule({ navigation }) {
                   {events.map((event, index) => {
                     const colorScheme = colors[event.type] || colors.green1;
                     const rowSpan = event.rowSpan || 1;
-                    // 幅が広くなったので ' - ' を ' ~ ' に置き換えて見やすく折り返し
                     const displayTime = event.time.replace(' - ', '\n~ ');
 
-                    // 重なり（衝突）数に応じて横幅を等分割する
                     const cardColWidth = (colWidth - 4) / event.overlapCount;
                     const cardLeft = event.dayIndex * colWidth + 2 + event.overlapIndex * cardColWidth;
 
@@ -359,17 +391,14 @@ export default function Schedule({ navigation }) {
                           {
                             left: cardLeft,
                             top: event.rowIndex * cardHeight + 2,
-                            width: cardColWidth - 2, // 等分された幅に設定
+                            width: cardColWidth - 2,
                             height: rowSpan * cardHeight - 4,
                             backgroundColor: colorScheme.bg,
                             zIndex: 10 + event.overlapIndex,
                           }
                         ]}
                       >
-                        {/* 左端のカラーバー */}
                         <View style={{ width: 3, height: '100%', backgroundColor: colorScheme.bar }} />
-                        
-                        {/* 時刻表示 */}
                         <View style={tw`flex-1 justify-center items-center p-[2px]`}>
                           <Text
                             style={[
@@ -399,12 +428,11 @@ export default function Schedule({ navigation }) {
                   })}
 
                 </View>
-              </View>
-            </ScrollView>
-          </View>
-
+              </ScrollView>
+            </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </View>
 
       {/* Fixed bottom navigation */}
       <BottomMenuBar activeTab="Schedule" navigation={navigation} />
