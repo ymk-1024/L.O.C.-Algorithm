@@ -286,6 +286,19 @@ export default function Schedule({ navigation }) {
                         
                         {/* 時刻表示 */}
                         <View style={tw`flex-1 justify-center items-center p-[2px]`}>
+                          {rowSpan > 1 && (
+                            <Text
+                              style={[
+                                tw`font-bold text-center mb-[2px] opacity-80`,
+                                {
+                                  fontSize: 9,
+                                  color: colorScheme.text,
+                                }
+                              ]}
+                            >
+                              {event.hours}時間
+                            </Text>
+                          )}
                           <Text
                             style={[
                               tw`font-bold text-center leading-[11px]`,
