@@ -63,15 +63,10 @@ const deleteDevice = async (req, res, next) => {
 // ① App → サーバー: OwnerToken 発行申請（ユーザーJWT認証必要）
 const issueOwnerToken = async (req, res, next) => {
   try {
-    const userUuid   = req.user_uuid; // autoRefreshAuth が付与
-    const deviceUuid = sanitize(req.body.deviceUuid);
-    const name       = sanitize(req.body.name) || 'Unknown Device';
+    const userUuid = req.user_uuid; // autoRefreshAuth が付与
+    const name     = sanitize(req.body.name) || 'Unknown Device';
 
-    if (!deviceUuid) {
-      return res.status(400).json({ status: 400, message: 'deviceUuid は必須です。' });
-    }
-
-    const result = await deviceService.issueOwnerToken(userUuid, deviceUuid, name);
+    const result = await deviceService.issueOwnerToken(userUuid, name);
     res.status(result.status).json(result);
   } catch (error) {
     next(error);
@@ -79,12 +74,18 @@ const issueOwnerToken = async (req, res, next) => {
 };
 
 // ② デバイス → サーバー: 自己登録（OwnerToken認証必要）
+// デバイスが自分で生成した uuid を body で送る
 const selfRegister = async (req, res, next) => {
   try {
-    const token = req.owner_token; // ownerTokenMiddleware が付与
-    const model = sanitize(req.body.model);
+    const token      = req.owner_token;              // ownerTokenMiddleware が付与
+    const deviceUuid = sanitize(req.body.uuid);      // デバイスが自分で生成したUUID
+    const model      = sanitize(req.body.model);
 
-    const result = await deviceService.selfRegister(token, model);
+    if (!deviceUuid) {
+      return res.status(400).json({ status: 400, message: 'uuid は必須です（デバイスが自分で生成したUUIDを送信してください）。' });
+    }
+
+    const result = await deviceService.selfRegister(token, deviceUuid, model);
     res.status(result.status).json(result);
   } catch (error) {
     next(error);
@@ -102,6 +103,83 @@ const refreshOwnerToken = async (req, res, next) => {
   }
 };
 
+// ④ デバイス → サーバー: ポーリング用
+const polling = async (req, res, next) => {
+  try {
+    const deviceUuid = req.device_uuid;
+    const userUuid = req.user_uuid;
+    const isSitting = req.query.is_sitting === 'true';
+
+    const result = await deviceService.polling(deviceUuid, userUuid, isSitting);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ⑤ デバイス → サーバー: コマンド詳細取得
+const getCommandDetails = async (req, res, next) => {
+  try {
+    const deviceUuid = req.device_uuid;
+    const commandId = sanitize(req.params.id);
+
+    const result = await deviceService.getCommandDetails(deviceUuid, commandId);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ⑥ デバイス → サーバー: 自己ステータス送信
+const updateDeviceStatus = async (req, res, next) => {
+  try {
+    const deviceUuid = req.device_uuid;
+    const batteryLevel = req.body.battery_level;
+    const isSitting = req.body.is_sitting === true || req.body.is_sitting === 'true';
+    const otherStatus = req.body.other_status;
+
+    const result = await deviceService.updateDeviceStatus(deviceUuid, batteryLevel, isSitting, otherStatus);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ⑦ デバイス → サーバー: デバイス設定取得
+const getDeviceSettings = async (req, res, next) => {
+  try {
+    const deviceUuid = req.device_uuid;
+    const result = await deviceService.getDeviceSettings(deviceUuid);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ⑧ デバイス → サーバー: 生存確認 (ping)
+const ping = async (req, res, next) => {
+  try {
+    const deviceUuid = req.device_uuid;
+    const result = await deviceService.ping(deviceUuid);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ⑨ デバイス → サーバー: 実行確認 (ACK)
+const ackCommand = async (req, res, next) => {
+  try {
+    const deviceUuid = req.device_uuid;
+    const commandId = sanitize(req.params.id);
+
+    const result = await deviceService.ackCommand(deviceUuid, commandId);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   getAllDevices,
   getDeviceById,
@@ -111,4 +189,10 @@ export default {
   issueOwnerToken,
   selfRegister,
   refreshOwnerToken,
+  polling,
+  getCommandDetails,
+  updateDeviceStatus,
+  getDeviceSettings,
+  ping,
+  ackCommand,
 };

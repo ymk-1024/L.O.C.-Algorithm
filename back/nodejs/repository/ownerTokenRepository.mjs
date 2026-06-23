@@ -10,16 +10,25 @@ const query = async (sql, values) => {
   }
 };
 
-// OwnerToken を発行・保存
-export const createOwnerToken = async (userUuid, deviceUuid, name, token, expiresAt) => {
+// OwnerToken を発行・保存（発行時点では device_uuid は不明なので NULL）
+export const createOwnerToken = async (userUuid, name, token, expiresAt) => {
   await query(
-    'INSERT INTO owner_tokens (user_uuid, device_uuid, name, token, expires_at) VALUES (?, ?, ?, ?, ?)',
-    [userUuid, deviceUuid, name, token, expiresAt]
+    'INSERT INTO owner_tokens (user_uuid, name, token, expires_at) VALUES (?, ?, ?, ?)',
+    [userUuid, name, token, expiresAt]
   );
-  return { userUuid, deviceUuid, name, token, expiresAt };
+  return { userUuid, name, token, expiresAt };
 };
 
-// device_uuid でレコード取得
+// token 文字列でレコード取得（有効性確認・自己登録用）
+export const getOwnerTokenByToken = async (token) => {
+  const results = await query(
+    'SELECT * FROM owner_tokens WHERE token = ? LIMIT 1',
+    [token]
+  );
+  return results.length > 0 ? results[0] : null;
+};
+
+// device_uuid でレコード取得（更新・重複確認用）
 export const getOwnerTokenByDeviceUuid = async (deviceUuid) => {
   const results = await query(
     'SELECT * FROM owner_tokens WHERE device_uuid = ? LIMIT 1',
@@ -28,13 +37,12 @@ export const getOwnerTokenByDeviceUuid = async (deviceUuid) => {
   return results.length > 0 ? results[0] : null;
 };
 
-// token 文字列でレコード取得（有効性確認用）
-export const getOwnerTokenByToken = async (token) => {
-  const results = await query(
-    'SELECT * FROM owner_tokens WHERE token = ? LIMIT 1',
-    [token]
+// 自己登録完了時にデバイスUUIDを紐づける
+export const assignDeviceToToken = async (token, deviceUuid) => {
+  await query(
+    'UPDATE owner_tokens SET device_uuid = ? WHERE token = ?',
+    [deviceUuid, token]
   );
-  return results.length > 0 ? results[0] : null;
 };
 
 // トークン更新（ローテーション）
@@ -53,8 +61,9 @@ export const deleteOwnerTokenByDeviceUuid = async (deviceUuid) => {
 
 export default {
   createOwnerToken,
-  getOwnerTokenByDeviceUuid,
   getOwnerTokenByToken,
+  getOwnerTokenByDeviceUuid,
+  assignDeviceToToken,
   updateOwnerToken,
   deleteOwnerTokenByDeviceUuid,
 };
