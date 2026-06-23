@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, Modal, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
 import AppHeader from './AppHeader';
@@ -102,6 +102,167 @@ export default function Schedule({ navigation }) {
   const gridScrollRef = useRef(null);
   const activeScrollSource = useRef(null); // 'header', 'grid', または null
 
+  // 奇数週・偶数週のスケジュール状態
+  const [eventsEven, setEventsEven] = useState([]);
+  const [eventsOdd, setEventsOdd] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 登録モーダル用の状態
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedDays, setSelectedDays] = useState([]); // 複数曜日選択可
+  const [startHour, setStartHour] = useState('08');
+  const [startMin, setStartMin] = useState('00');
+  const [endHour, setEndHour] = useState('10');
+  const [endMin, setEndMin] = useState('00');
+  const [selectedType, setSelectedType] = useState('green1');
+  const [applyToBothWeeks, setApplyToBothWeeks] = useState(true);
+
+  // 時・分の選択肢モーダル用
+  const [pickerType, setPickerType] = useState(null); // 'startHour', 'startMin', 'endHour', 'endMin', または null
+
+  // APIデータ取得（プレースホルダー）
+  const fetchSchedules = async () => {
+    try {
+      setIsLoading(true);
+      console.log('[API Schedule] Mock: Fetching schedules from backend API...');
+      
+      // 1秒の擬似ディレイ
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // 初期データをマップしてID付きで設定
+      const initialEven = SCHEDULE_EVENTS_EVEN.map((e, index) => ({ ...e, id: `even-${index}` }));
+      const initialOdd = SCHEDULE_EVENTS_ODD.map((e, index) => ({ ...e, id: `odd-${index}` }));
+
+      setEventsEven(initialEven);
+      setEventsOdd(initialOdd);
+      console.log('[API Schedule] Mock: Schedules fetched successfully.');
+    } catch (error) {
+      console.error('[API Schedule] Error fetching schedules:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // APIデータ保存（プレースホルダー）
+  const saveSchedules = async (updatedEven, updatedOdd) => {
+    try {
+      console.log('[API Schedule] Mock: Saving updated schedules to backend API...');
+      console.log('[API Schedule] Payload (Even):', JSON.stringify(updatedEven));
+      console.log('[API Schedule] Payload (Odd):', JSON.stringify(updatedOdd));
+
+      // 実際にはここで fetch(API_URL, { method: 'PUT', ... }) を行う
+      // 例: await fetch(`${getApiUrl()}/schedules`, { method: 'PUT', body: ... })
+      
+      console.log('[API Schedule] Mock: Schedules saved successfully.');
+    } catch (error) {
+      console.error('[API Schedule] Error saving schedules:', error);
+    }
+  };
+
+  // 初期ロード
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
+
+  const openPicker = (type) => {
+    setPickerType(type);
+  };
+
+  const handleSelectValue = (val) => {
+    if (pickerType === 'startHour') setStartHour(val);
+    if (pickerType === 'startMin') setStartMin(val);
+    if (pickerType === 'endHour') setEndHour(val);
+    if (pickerType === 'endMin') setEndMin(val);
+    setPickerType(null);
+  };
+
+  // スケジュール登録
+  const handleRegister = () => {
+    if (selectedDays.length === 0) {
+      Alert.alert('エラー', '曜日を選択してください。');
+      return;
+    }
+
+    const startTotalMin = Number(startHour) * 60 + Number(startMin);
+    const endTotalMin = Number(endHour) * 60 + Number(endMin);
+
+    if (startTotalMin >= endTotalMin) {
+      Alert.alert('エラー', '終了時刻は開始時刻より後に設定してください。');
+      return;
+    }
+
+    const hours = (endTotalMin - startTotalMin) / 60;
+    const rowIndex = startTotalMin / 120;
+
+    // 選択された各曜日に対してイベントオブジェクトを作成
+    const newEvents = selectedDays.map((dayIdx) => ({
+      id: `custom-${Date.now()}-${dayIdx}-${Math.random()}`,
+      dayIndex: dayIdx,
+      rowIndex,
+      hours,
+      type: selectedType,
+    }));
+
+    let nextEven = [...eventsEven];
+    let nextOdd = [...eventsOdd];
+
+    if (applyToBothWeeks) {
+      nextEven = [...nextEven, ...newEvents];
+      nextOdd = [...nextOdd, ...newEvents];
+    } else {
+      if (isEvenWeek) {
+        nextEven = [...nextEven, ...newEvents];
+      } else {
+        nextOdd = [...nextOdd, ...newEvents];
+      }
+    }
+
+    setEventsEven(nextEven);
+    setEventsOdd(nextOdd);
+    saveSchedules(nextEven, nextOdd);
+
+    // モーダルを閉じ、状態をリセット
+    setModalVisible(false);
+    setSelectedDays([]);
+    setStartHour('08');
+    setStartMin('00');
+    setEndHour('10');
+    setEndMin('00');
+    setSelectedType('green1');
+  };
+
+  // スケジュール削除確認
+  const handleCardPress = (event) => {
+    Alert.alert(
+      'スケジュールの削除',
+      `${event.time} のスケジュールを削除しますか？`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: () => deleteEvent(event),
+        },
+      ]
+    );
+  };
+
+  // スケジュール削除処理
+  const deleteEvent = (eventToDelete) => {
+    let nextEven = [...eventsEven];
+    let nextOdd = [...eventsOdd];
+
+    if (isEvenWeek) {
+      nextEven = nextEven.filter((e) => e.id !== eventToDelete.id);
+    } else {
+      nextOdd = nextOdd.filter((e) => e.id !== eventToDelete.id);
+    }
+
+    setEventsEven(nextEven);
+    setEventsOdd(nextOdd);
+    saveSchedules(nextEven, nextOdd);
+  };
+
   const handleGridScroll = (event) => {
     if (activeScrollSource.current === 'header') return;
     const x = event.nativeEvent.contentOffset.x;
@@ -164,7 +325,7 @@ export default function Schedule({ navigation }) {
 
   const weekTime = currentWeekStart.getTime();
   const isEvenWeek = Math.floor(weekTime / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
-  const rawEvents = isEvenWeek ? SCHEDULE_EVENTS_EVEN : SCHEDULE_EVENTS_ODD;
+  const rawEvents = isEvenWeek ? eventsEven : eventsOdd;
 
   const processOverlaps = (eventsList) => {
     const daysEvents = Array.from({ length: 7 }, () => []);
@@ -389,6 +550,7 @@ export default function Schedule({ navigation }) {
                       <TouchableOpacity
                         key={index}
                         activeOpacity={0.8}
+                        onPress={() => handleCardPress(event)}
                         style={[
                           tw`rounded-[8px] absolute flex-row overflow-hidden border border-black/5`,
                           {
@@ -436,6 +598,199 @@ export default function Schedule({ navigation }) {
           </ScrollView>
         </View>
       </View>
+
+      {/* フローティング登録ボタン */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setModalVisible(true)}
+        style={[
+          tw`absolute w-14 h-14 bg-[#1E3D37] rounded-full items-center justify-center shadow-lg`,
+          {
+            right: 24,
+            bottom: Math.max(insets.bottom, 16) + 68,
+            zIndex: 99,
+          }
+        ]}
+      >
+        <Text style={tw`text-white text-[30px] font-semibold leading-[34px] text-center`}>+</Text>
+      </TouchableOpacity>
+
+      {/* スケジュール登録モーダル */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={tw`flex-row flex-1 bg-black/50 justify-end items-end`}>
+          <View style={tw`bg-white rounded-t-[32px] p-6 pb-8 w-full`}>
+            <Text style={tw`text-[20px] font-bold text-[#1E3D37] text-center mb-6`}>
+              スケジュールを登録
+            </Text>
+
+            {/* 曜日選択 */}
+            <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-2`}>曜日 (複数選択可)</Text>
+            <View style={tw`flex-row justify-between mb-5`}>
+              {['月', '火', '水', '木', '金', '土', '日'].map((dayLabel, idx) => {
+                const isSelected = selectedDays.includes(idx);
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => {
+                      setSelectedDays((prev) =>
+                        prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx]
+                      );
+                    }}
+                    style={[
+                      tw`w-10 h-10 rounded-full justify-center items-center border`,
+                      isSelected
+                        ? tw`bg-[#1E3D37] border-[#1E3D37]`
+                        : tw`bg-white border-gray-200`,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        tw`text-[14px] font-bold`,
+                        isSelected ? tw`text-white` : tw`text-[#1C1C1E]`,
+                      ]}
+                    >
+                      {dayLabel}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 時間設定 */}
+            <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-2`}>時間帯</Text>
+            <View style={tw`flex-row items-center justify-between mb-5 bg-[#F4F6F5] p-3 rounded-[16px]`}>
+              {/* 開始時刻 */}
+              <View style={tw`flex-row items-center gap-1`}>
+                <TouchableOpacity
+                  onPress={() => openPicker('startHour')}
+                  style={tw`bg-white px-3 py-2 rounded-[8px] border border-gray-200`}
+                >
+                  <Text style={tw`text-[16px] font-bold text-black`}>{startHour}</Text>
+                </TouchableOpacity>
+                <Text style={tw`text-black font-semibold`}>:</Text>
+                <TouchableOpacity
+                  onPress={() => openPicker('startMin')}
+                  style={tw`bg-white px-3 py-2 rounded-[8px] border border-gray-200`}
+                >
+                  <Text style={tw`text-[16px] font-bold text-black`}>{startMin}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={tw`text-gray-400 font-bold mx-2`}>〜</Text>
+
+              {/* 終了時刻 */}
+              <View style={tw`flex-row items-center gap-1`}>
+                <TouchableOpacity
+                  onPress={() => openPicker('endHour')}
+                  style={tw`bg-white px-3 py-2 rounded-[8px] border border-gray-200`}
+                >
+                  <Text style={tw`text-[16px] font-bold text-black`}>{endHour}</Text>
+                </TouchableOpacity>
+                <Text style={tw`text-black font-semibold`}>:</Text>
+                <TouchableOpacity
+                  onPress={() => openPicker('endMin')}
+                  style={tw`bg-white px-3 py-2 rounded-[8px] border border-gray-200`}
+                >
+                  <Text style={tw`text-[16px] font-bold text-black`}>{endMin}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* カラーグループ選択 */}
+            <Text style={tw`text-[14px] font-bold text-[#7E8B93] mb-2`}>カラー</Text>
+            <View style={tw`flex-row gap-3 mb-5`}>
+              {['green1', 'green2', 'green3', 'green4', 'green5', 'gray'].map((type) => {
+                const colorScheme = colors[type];
+                const isSelected = selectedType === type;
+                return (
+                  <TouchableOpacity
+                    key={type}
+                    onPress={() => setSelectedType(type)}
+                    style={[
+                      tw`w-8 h-8 rounded-full border-2 justify-center items-center`,
+                      { backgroundColor: colorScheme.bg },
+                      isSelected ? { borderColor: colorScheme.bar } : { borderColor: 'transparent' },
+                    ]}
+                  >
+                    {isSelected && (
+                      <View style={[tw`w-3 h-3 rounded-full`, { backgroundColor: colorScheme.bar }]} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 毎週適用トグル */}
+            <View style={tw`flex-row justify-between items-center mb-6`}>
+              <Text style={tw`text-[14px] font-bold text-[#1C1C1E]`}>毎週（奇数週・偶数週の両方）適用する</Text>
+              <TouchableOpacity
+                onPress={() => setApplyToBothWeeks(!applyToBothWeeks)}
+                style={[
+                  tw`w-12 h-6 rounded-full p-1 justify-center`,
+                  applyToBothWeeks ? tw`bg-[#1E3D37] items-end` : tw`bg-gray-300 items-start`,
+                ]}
+              >
+                <View style={tw`w-4 h-4 rounded-full bg-white`} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ボタン類 */}
+            <View style={tw`flex-row gap-3`}>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={tw`flex-1 py-3 bg-gray-100 rounded-full justify-center items-center`}
+              >
+                <Text style={tw`text-[#7E8B93] font-bold`}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleRegister}
+                style={tw`flex-1 py-3 bg-[#1E3D37] rounded-full justify-center items-center`}
+              >
+                <Text style={tw`text-white font-bold`}>登録する</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 簡易選択ピッカーモーダル */}
+      <Modal
+        visible={pickerType !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPickerType(null)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={tw`flex-1 bg-black/40 justify-center items-center`}
+          onPress={() => setPickerType(null)}
+        >
+          <View style={tw`bg-white rounded-[20px] w-64 max-h-80 p-4 shadow-xl`}>
+            <Text style={tw`text-[16px] font-bold text-center text-[#1E3D37] mb-3`}>
+              {pickerType?.includes('Hour') ? '時間を選択' : '分を選択'}
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {(pickerType?.includes('Hour')
+                ? Array.from({ length: 24 }).map((_, i) => String(i).padStart(2, '0'))
+                : Array.from({ length: 12 }).map((_, i) => String(i * 5).padStart(2, '0'))
+              ).map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  onPress={() => handleSelectValue(val)}
+                  style={tw`py-3 border-b border-gray-100 items-center`}
+                >
+                  <Text style={tw`text-[18px] font-semibold text-[#1C1C1E]`}>{val}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Fixed bottom navigation */}
       <BottomMenuBar activeTab="Schedule" navigation={navigation} />
