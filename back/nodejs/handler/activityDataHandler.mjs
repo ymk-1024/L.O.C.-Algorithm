@@ -33,8 +33,19 @@ const createActivityData = async (req, res, next) => {
   }
 };
 
+const deleteActivityData = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const result = await activityDataService.deleteActivityData(uuid);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   getAllActivityData,
   getActivityDataById,
   createActivityData,
+  deleteActivityData,
 };

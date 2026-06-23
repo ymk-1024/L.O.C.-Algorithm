@@ -33,4 +33,8 @@ export const createActivityData = async (uuid, deviceUuid, type) => {
   return { uuid, deviceUuid, type };
 };
 
-export default { getAllActivityData, getActivityDataById, createActivityData };
+export const deleteActivityData = async (uuid) => {
+  await query('DELETE FROM activity_data WHERE uuid = ?', [uuid]);
+};
+
+export default { getAllActivityData, getActivityDataById, createActivityData, deleteActivityData };

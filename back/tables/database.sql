@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS `device` (
     `status` VARCHAR(255) NOT NULL,
     `create_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `update_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_uuid) REFERENCES users(uuid)
+    FOREIGN KEY (user_uuid) REFERENCES users(uuid) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS `sit_data` (
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `sit_data` (
     `device_uuid` VARCHAR(255) NOT NULL,
     `start_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `end_at` TIMESTAMP DEFAULT NULL,
-    FOREIGN KEY (device_uuid) REFERENCES device(uuid)
+    FOREIGN KEY (device_uuid) REFERENCES device(uuid) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS `activity_data` (
@@ -31,13 +31,13 @@ CREATE TABLE IF NOT EXISTS `activity_data` (
     `device_uuid` VARCHAR(255) NOT NULL,
     `type` VARCHAR(255) NOT NULL,
     `create_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (device_uuid) REFERENCES device(uuid)
+    FOREIGN KEY (device_uuid) REFERENCES device(uuid) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS `refresh_tokens` (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_uuid VARCHAR(255) NOT NULL,
-    token VARCHAR(1024) NOT NULL,
+    token VARCHAR(512) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NULL,
     PRIMARY KEY (id),

@@ -25,7 +25,7 @@ const DAYS = [
   { label: '土', date: '29' },
 ];
 
-export default function ScheduleScreen() {
+export default function ScheduleScreen( { navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       {/* ヘッダー */}
@@ -84,9 +84,6 @@ export default function ScheduleScreen() {
 
           <View style={styles.gridRow}>
             {/* 4段目 */}
-            <LinearGradient colors={['#a855f7', '#ec4899']} style={styles.cell}><Text style={styles.cellText}>4時間の{"\n"}16:00</Text></LinearGradient>
-            <LinearGradient colors={['#3b82f6', '#10b981']} style={styles.cell}><Text style={styles.cellText}>4時間の{"\n"}13:00~</Text></LinearGradient>
-            <LinearGradient colors={['#fef08a', '#fca5a5']} style={styles.cell} />
             <View style={[styles.cell, styles.bgEmptyText]} />
             <View style={[styles.cell, styles.bgEmptyText]} />
             <View style={[styles.cell, styles.bgEmptyText]} />
@@ -96,14 +93,12 @@ export default function ScheduleScreen() {
           <View style={styles.gridRow}>
             {/* 5段目（横結合を簡易再現） */}
             <View style={[styles.cell, styles.bgPinkLight]} />
-            <LinearGradient colors={['#a855f7', '#10b981']} start={{x: 0, y: 0}} end={{x: 1, y: 0}} style={[styles.cell, { width: COLUMN_WIDTH * 5 - 4 }]}><Text style={styles.cellTextLeft}>4時間の 15:00~</Text></LinearGradient>
           </View>
 
           <View style={styles.gridRow}>
             {/* 6段目 */}
             <View style={[styles.cell, styles.bgEmpty]} />
             <View style={[styles.cell, styles.bgPinkLight]} />
-            <LinearGradient colors={['#6366f1', '#10b981']} start={{x: 0, y: 0}} end={{x: 1, y: 0}} style={styles.cell}><Text style={styles.cellText}>5時間の{"\n"}18:00~</Text></LinearGradient>
             <View style={[styles.cell, styles.bgEmptyText]} />
             <View style={[styles.cell, styles.bgEmpty]} />
             <View style={[styles.cell, styles.bgEmpty]} />
@@ -113,7 +108,6 @@ export default function ScheduleScreen() {
           <View style={styles.gridRow}>
             {/* 7段目 */}
             <View style={[styles.cell, styles.bgEmpty]} />
-            <LinearGradient colors={['#a855f7', '#10b981']} start={{x: 0, y: 0}} end={{x: 1, y: 0}} style={[styles.cell, { width: COLUMN_WIDTH * 2 - 4 }]}><Text style={styles.cellTextLeft}>6時間の 16:00~</Text></LinearGradient>
           </View>
         </ScrollView>
       </View>

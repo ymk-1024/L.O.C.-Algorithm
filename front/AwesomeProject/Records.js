@@ -9,18 +9,20 @@ import {
 import Svg, { Rect, Line, Polyline, Defs, LinearGradient, Stop } from 'react-native-svg';
 import AppHeader from './AppHeader';
 import BottomMenuBar from './BottomMenuBar';
+import { useIsFocused } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
-const CARD_PADDING = 20;
+const CARD_PADDING = 10;
 const CHART_WIDTH = width - 40 - (CARD_PADDING * 2); // グラフの横幅
 const CHART_HEIGHT = 160; // グラフの高さ
 
 // グラフデータ（Jan〜Aug）
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
 const BAR_VALUES = [50, 95, 60, 85, 130, 90, 115, 95]; // 棒グラフの高さ（仮値）
-const LINE_POINTS = "25,110 65,95 105,115 145,100 185,105 225,110 265,95 305,95"; // 折れ線の座標（仮値）
 
-export default function RecordScreen() {
+export default function RecordScreen({ navigation  }) {
+  const isFocused = useIsFocused();
+
   return (
     <SafeAreaView style={styles.container}>
       {/* ヘッダー */}
@@ -43,48 +45,42 @@ export default function RecordScreen() {
 
         {/* グラフエリア */}
         <View style={styles.chartContainer}>
-          <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
-            <Defs>
-              {/* 縦グラデーションの定義 */}
-              <LinearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor="#a3e635" />
-                <Stop offset="50%" stopColor="#3b82f6" />
-                <Stop offset="100%" stopColor="#ec4899" />
-              </LinearGradient>
-            </Defs>
+          {isFocused && (
+            <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+              <Defs>
+                {/* 縦グラデーションの定義 */}
+                <LinearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0%" stopColor="#3ce2e7" />
+                  <Stop offset="50%" stopColor="#3b8cf6" />
+                  <Stop offset="100%" stopColor="#1b2df0" />
+                </LinearGradient>
+              </Defs>
 
-            {/* Y軸（左の縦線） */}
-            <Line x1="15" y1="10" x2="15" y2="130" stroke="#cbd5e1" strokeWidth="2" />
-            {/* X軸（下の横線） */}
-            <Line x1="15" y1="130" x2={CHART_WIDTH - 5} y2="130" stroke="#cbd5e1" strokeWidth="2" />
+              {/* Y軸（左の縦線） */}
+              <Line x1="15" y1="10" x2="15" y2="130" stroke="#cbd5e1" strokeWidth="2" />
+              {/* X軸（下の横線） */}
+              <Line x1="15" y1="130" x2={CHART_WIDTH - 5} y2="130" stroke="#cbd5e1" strokeWidth="2" />
 
-            {/* 棒グラフの描画 */}
-            {BAR_VALUES.map((val, index) => {
-              const barWidth = 16;
-              const spacing = (CHART_WIDTH - 30) / 8;
-              const x = 25 + index * spacing;
-              const y = 130 - val;
-              return (
-                <Rect
-                  key={index}
-                  x={x - barWidth / 2}
-                  y={y}
-                  width={barWidth}
-                  height={val}
-                  fill="url(#barGrad)"
-                  rx="3" // 角丸
-                />
-              );
-            })}
-
-            {/* 折れ線グラフ */}
-            <Polyline
-              points={LINE_POINTS}
-              fill="none"
-              stroke="#f8fafc"
-              strokeWidth="2"
-            />
-          </Svg>
+              {/* 棒グラフの描画 */}
+              {BAR_VALUES.map((val, index) => {
+                const barWidth = 20;
+                const spacing = (CHART_WIDTH - 30) / 8;
+                const x = 85 + index * spacing;
+                const y = 129 - val;
+                return (
+                  <Rect
+                    key={index}
+                    x={x - barWidth / 2}
+                    y={y}
+                    width={barWidth}
+                    height={val}
+                    fill="url(#barGrad)"
+                    rx="3"
+                  />
+                );
+              })}
+            </Svg>
+          )}
 
           {/* X軸のラベル（月名） */}
           <View style={styles.monthsRow}>
@@ -116,17 +112,19 @@ export default function RecordScreen() {
             <Text style={[styles.statusLabel, { marginTop: 5 }]}>100%</Text>
           </View>
         </View>
+
+        {/* 説明テキストエリア */}
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.descriptionText}>
+            着席時間の着席時間は、週間平均：6時間
+          </Text>
+          <Text style={styles.descriptionText}>
+            携方法と詳細細設定を選択してください。
+          </Text>
+        </View>
       </View>
 
-      {/* 説明テキストエリア */}
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionText}>
-          着席時間の着席時間は、週間平均：6時間
-        </Text>
-        <Text style={styles.descriptionText}>
-          携方法と詳細細設定を選択してください。
-        </Text>
-      </View>
+      
 
       {/* フッタータブ */}
       <BottomMenuBar activeTab="Records" navigation={navigation} />
@@ -165,6 +163,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   card: {
+    flex: 1,
     backgroundColor: '#fff',
     marginHorizontal: 15,
     borderRadius: 24,
@@ -190,7 +189,7 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    justifyContent: 'between',
+    justifyContent: 'space-between',
     marginBottom: 15,
   },
   infoLabel: {
@@ -266,7 +265,8 @@ const styles = StyleSheet.create({
   },
   descriptionContainer: {
     paddingHorizontal: 30,
-    marginTop: 20,
+    marginTop: 'auto',
+    marginbottom: 20,
   },
   descriptionText: {
     fontSize: 14,

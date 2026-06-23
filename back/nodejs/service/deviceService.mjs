@@ -42,6 +42,41 @@ const deviceService = {
       throw new Error(`DB Error: ${error.message}`);
     }
   },
+
+  updateDevice: async (uuid, name, type, status) => {
+    try {
+      const existing = await deviceRepository.getDeviceById(uuid);
+      if (!existing) {
+        return { status: 404, message: 'Device not found' };
+      }
+
+      const nextName   = name   ?? existing.name;
+      const nextType   = type   ?? existing.type;
+      const nextStatus = status ?? existing.status;
+
+      const updated = await deviceRepository.updateDevice(uuid, nextName, nextType, nextStatus);
+      return {
+        status: 200,
+        message: 'Device updated successfully',
+        data: updated,
+      };
+    } catch (error) {
+      throw new Error(`DB Error: ${error.message}`);
+    }
+  },
+
+  deleteDevice: async (uuid) => {
+    try {
+      const existing = await deviceRepository.getDeviceById(uuid);
+      if (!existing) {
+        return { status: 404, message: 'Device not found' };
+      }
+      await deviceRepository.deleteDevice(uuid);
+      return { status: 200, message: 'Device deleted successfully' };
+    } catch (error) {
+      throw new Error(`DB Error: ${error.message}`);
+    }
+  },
 };
 
 export default deviceService;
