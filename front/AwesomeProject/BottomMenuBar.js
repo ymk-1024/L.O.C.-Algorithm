@@ -21,10 +21,11 @@ export default function BottomMenuBar({ activeTab, navigation }) {
       navigation.navigate('Settings');
     } else if (id === 'Account') {
       navigation.navigate('Account');
+    } else if (id === 'Schedule') {
+      navigation.navigate('Schedule');
     } else {
       const labelMap = {
         Records: '記録',
-        Schedule: 'スケジュール',
       };
       Alert.alert('準備中', `「${labelMap[id]}」画面は現在開発中です。`);
     }

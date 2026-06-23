@@ -1,258 +1,225 @@
 import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  SafeAreaView,
-  Dimensions,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient'; // Expo環境を想定（Vanilla RNの場合は react-native-linear-gradient を使用）
+import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import tw from 'twrnc';
 import AppHeader from './AppHeader';
 import BottomMenuBar from './BottomMenuBar';
 
 const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = (width - 40) / 7; // 横幅からマージンを除いて7等分
+const marginHorizontal = 16;
+const colWidth = (width - marginHorizontal * 2) / 7;
+const cardHeight = 62;
 
-// 曜日のデータ
 const DAYS = [
-  { label: '月', date: '15' },
-  { label: '火', date: '16' },
-  { label: '水', date: '17' },
-  { label: '木', date: '18' },
-  { label: '金', date: '29' }, // 画像通りの表記
-  { label: '金', date: '20' },
-  { label: '土', date: '29' },
+  { key: 'Mon', label: '月', date: '15' },
+  { key: 'Tue', label: '火', date: '16' },
+  { key: 'Wed', label: '水', date: '17' },
+  { key: 'Thu', label: '木', date: '18' },
+  { key: 'Fri', label: '金', date: '19' },
+  { key: 'Sat', label: '土', date: '20' },
+  { key: 'Sun', label: '日', date: '21' },
 ];
 
-export default function ScheduleScreen( { navigation }) {
+const colors = {
+  green1: { bg: '#1E3D37', text: '#FFFFFF' }, // 1時間 (深緑)
+  green2: { bg: '#2D5C52', text: '#FFFFFF' }, // 2時間
+  green3: { bg: '#4A7C72', text: '#FFFFFF' }, // 3時間
+  green4: { bg: '#70968F', text: '#FFFFFF' }, // 4時間
+  green5: { bg: '#8FAEA6', text: '#1E3D37' }, // 5時間
+  gray:   { bg: '#7E8B93', text: '#FFFFFF' }, // 6時間 (グレー)
+  empty:  { bg: '#F4F5F7', border: '#E5E5EA' }, // 空白
+};
+
+// 7行のグリッドデータ
+const GRID_ROWS_COUNT = 7;
+
+const SCHEDULE_DATA = {
+  Mon: [
+    { hours: 1, time: '9:00~', type: 'green1' },
+    { hours: 2, time: '9:00~', type: 'green2' },
+    { hours: 3, time: '11:30~', type: 'green3' },
+    { hours: 4, time: '16:00~', type: 'green4' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'empty' },
+  ],
+  Tue: [
+    { hours: 1, time: '13:00~', type: 'green1' },
+    { hours: 2, time: '19:00~', type: 'green2' },
+    { hours: 3, time: '11:00~', type: 'green3' },
+    { hours: 4, time: '13:00~', type: 'green4' },
+    { hours: 4, time: '15:00~', type: 'green5', span: 5 }, // 水〜土まで跨ぐ
+    { type: 'empty' },
+    { hours: 6, time: '16:00~', type: 'gray' },
+  ],
+  Wed: [
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'underSpan' }, // 火曜のまたがるカードの下に隠れる
+    { hours: 5, time: '18:00~', type: 'green5' },
+    { type: 'empty' },
+  ],
+  Thu: [
+    { hours: 1, time: '19:00~', type: 'green1' },
+    { hours: 2, time: '19:00~', type: 'green2' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'underSpan' }, // 火曜のまたがるカードの下に隠れる
+    { type: 'empty' },
+    { type: 'empty' },
+  ],
+  Fri: [
+    { hours: 1, time: '12:00~', type: 'green1' },
+    { hours: 2, time: '19:00~', type: 'green2' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'underSpan' }, // 火曜のまたがるカードの下に隠れる
+    { type: 'empty' },
+    { type: 'empty' },
+  ],
+  Sat: [
+    { hours: 1, time: '19:30~', type: 'green1' },
+    { hours: 2, time: '19:30~', type: 'green2' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'underSpan' }, // 火曜のまたがるカードの下に隠れる
+    { type: 'empty' },
+    { type: 'empty' },
+  ],
+  Sun: [
+    { hours: 1, time: '9:00~', type: 'green1' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'empty' },
+    { type: 'empty' },
+  ],
+};
+
+export default function Schedule({ navigation }) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* ヘッダー */}
+    <View style={tw`flex-1 bg-[#F7F9FB]`}>
       <AppHeader />
 
-      {/* メインカード */}
-      <View style={styles.card}>
-        <View style={styles.titleBadge}>
-          <Text style={styles.titleBadgeText}>スケジュール</Text>
+      <ScrollView contentContainerStyle={tw`px-[${marginHorizontal}px] pb-6`}>
+        {/* Title Banner */}
+        <View style={tw`bg-[#EAF6F3] rounded-[20px] py-4 px-6 mb-5 items-center`}>
+          <Text style={tw`text-[26px] font-bold text-[#1E3D37]`}>スケジュール</Text>
         </View>
 
-        {/* 曜日・日付ヘッダー */}
-        <View style={styles.weekHeader}>
-          {DAYS.map((day, index) => (
-            <View key={index} style={styles.dayColumn}>
-              <Text style={styles.dayLabel}>{day.label}</Text>
-              <Text style={styles.dateLabel}>{day.date}</Text>
-            </View>
-          ))}
+        {/* Schedule Grid Box */}
+        <View style={tw`bg-white rounded-[24px] p-3 shadow-sm border border-[#EAEAEA]`}>
+          
+          {/* Days Header */}
+          <View style={tw`flex-row border-b border-[#F2F2F7] pb-3 mb-2`}>
+            {DAYS.map((day) => (
+              <View key={day.key} style={{ width: colWidth - 1, alignItems: 'center' }}>
+                <Text style={tw`text-[13px] font-medium text-[#7E8B93] mb-1`}>{day.label}</Text>
+                <Text style={tw`text-[16px] font-bold text-[#1C1C1E]`}>{day.date}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Grid Layout */}
+          <View style={tw`flex-row relative`}>
+            {DAYS.map((day) => {
+              const dayData = SCHEDULE_DATA[day.key] || [];
+              return (
+                <View key={day.key} style={{ width: colWidth - 1, zIndex: 1 }}>
+                  {Array.from({ length: GRID_ROWS_COUNT }).map((_, rowIndex) => {
+                    const cell = dayData[rowIndex] || { type: 'empty' };
+
+                    // スパンカードが重なる非表示セル
+                    if (cell.type === 'underSpan') {
+                      return (
+                        <View
+                          key={rowIndex}
+                          style={{ height: cardHeight, margin: 2 }}
+                        />
+                      );
+                    }
+
+                    // 空白セル
+                    if (cell.type === 'empty') {
+                      return (
+                        <View
+                          key={rowIndex}
+                          style={[
+                            tw`rounded-[8px] border border-dashed`,
+                            {
+                              height: cardHeight - 4,
+                              margin: 2,
+                              backgroundColor: colors.empty.bg,
+                              borderColor: colors.empty.border,
+                            }
+                          ]}
+                        />
+                      );
+                    }
+
+                    // 通常またはスパンの予定カード
+                    const colorScheme = colors[cell.type] || colors.green1;
+                    const isSpan = cell.span > 1;
+
+                    return (
+                      <View
+                        key={rowIndex}
+                        style={[
+                          tw`rounded-[8px] p-[3px] justify-center items-center`,
+                          {
+                            height: cardHeight - 4,
+                            margin: 2,
+                            backgroundColor: colorScheme.bg,
+                          },
+                          isSpan && {
+                            position: 'absolute',
+                            width: (colWidth - 1) * cell.span - 4,
+                            zIndex: 10,
+                            left: 0,
+                          }
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            tw`font-bold text-center leading-[13px]`,
+                            {
+                              fontSize: isSpan ? 11 : 9,
+                              color: colorScheme.text,
+                            }
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {cell.hours}時間の
+                        </Text>
+                        <Text
+                          style={[
+                            tw`font-bold text-center mt-[1px]`,
+                            {
+                              fontSize: isSpan ? 11 : 9,
+                              color: colorScheme.text,
+                            }
+                          ]}
+                        >
+                          {cell.time}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
+
         </View>
+      </ScrollView>
 
-        {/* スケジュールグリッド（スクロール可能） */}
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollGrid}>
-          <View style={styles.gridRow}>
-            {/* 1段目 */}
-            <View style={[styles.cell, styles.bgTeal]}><Text style={styles.cellText}>1時間の{"\n"}9:00~</Text></View>
-            <View style={[styles.cell, styles.bgTeal]}><Text style={styles.cellText}>1時間の{"\n"}13:00~</Text></View>
-            <View style={[styles.cell, styles.bgEmpty]} />
-            <View style={[styles.cell, styles.bgTeal]}><Text style={styles.cellText}>1時間の{"\n"}19:00~</Text></View>
-            <View style={[styles.cell, styles.bgTeal]}><Text style={styles.cellText}>1時間の{"\n"}12:00~</Text></View>
-            <View style={[styles.cell, styles.bgTeal]}><Text style={styles.cellText}>1時間の{"\n"}19:30~</Text></View>
-            <View style={[styles.cell, styles.bgTeal]}><Text style={styles.cellText}>1時間の{"\n"}9:00~</Text></View>
-          </View>
-
-          <View style={styles.gridRow}>
-            {/* 2段目 */}
-            <View style={[styles.cell, styles.bgLime]}><Text style={styles.cellText}>2時間の{"\n"}9:00~</Text></View>
-            <View style={[styles.cell, styles.bgLime]}><Text style={styles.cellText}>2時間の{"\n"}19:00~</Text></View>
-            <View style={[styles.cell, styles.bgEmptyLime]} />
-            <View style={[styles.cell, styles.bgLime]}><Text style={styles.cellText}>2時間の{"\n"}19:00~</Text></View>
-            <View style={[styles.cell, styles.bgLime]}><Text style={styles.cellText}>2時間の{"\n"}19:00~</Text></View>
-            <View style={[styles.cell, styles.bgLime]}><Text style={styles.cellText}>2時間の{"\n"}19:30~</Text></View>
-            <View style={[styles.cell, styles.bgEmpty]} />
-          </View>
-
-          <View style={styles.gridRow}>
-            {/* 3段目 */}
-            <View style={[styles.cell, styles.bgOrange]}><Text style={styles.cellText}>3時間の{"\n"}11:30</Text></View>
-            <View style={[styles.cell, styles.bgOrange]}><Text style={styles.cellText}>3時間の{"\n"}11:00~</Text></View>
-            <View style={[styles.cell, styles.bgEmptyLime]} />
-            <View style={[styles.cell, styles.bgEmptyText]} />
-            <View style={[styles.cell, styles.bgEmptyText]} />
-            <View style={[styles.cell, styles.bgEmptyText]} />
-            <View style={[styles.cell, styles.bgEmpty]} />
-          </View>
-
-          <View style={styles.gridRow}>
-            {/* 4段目 */}
-            <View style={[styles.cell, styles.bgEmptyText]} />
-            <View style={[styles.cell, styles.bgEmptyText]} />
-            <View style={[styles.cell, styles.bgEmptyText]} />
-            <View style={[styles.cell, styles.bgEmpty]} />
-          </View>
-
-          <View style={styles.gridRow}>
-            {/* 5段目（横結合を簡易再現） */}
-            <View style={[styles.cell, styles.bgPinkLight]} />
-          </View>
-
-          <View style={styles.gridRow}>
-            {/* 6段目 */}
-            <View style={[styles.cell, styles.bgEmpty]} />
-            <View style={[styles.cell, styles.bgPinkLight]} />
-            <View style={[styles.cell, styles.bgEmptyText]} />
-            <View style={[styles.cell, styles.bgEmpty]} />
-            <View style={[styles.cell, styles.bgEmpty]} />
-            <View style={[styles.cell, styles.bgEmpty]} />
-          </View>
-
-          <View style={styles.gridRow}>
-            {/* 7段目 */}
-            <View style={[styles.cell, styles.bgEmpty]} />
-          </View>
-        </ScrollView>
-      </View>
-
-      {/* フッタータブ */}
-      <BottomMenuBar activeTab="Schedule" navigation={navigation}/>
-    </SafeAreaView>
+      {/* Fixed bottom navigation */}
+      <BottomMenuBar activeTab="Schedule" navigation={navigation} />
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#e0f2fe', // 背景の薄いグラデーションベース
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  logoContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#64748b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  logoText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  card: {
-    flex: 1,
-    backgroundColor: '#fff',
-    marginHorizontal: 15,
-    borderRadius: 24,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  titleBadge: {
-    backgroundColor: '#e2f3f5',
-    alignSelf: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginTop: 5,
-    marginBottom: 15,
-  },
-  titleBadgeText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  weekHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingBottom: 8,
-  },
-  dayColumn: {
-    width: COLUMN_WIDTH,
-    alignItems: 'center',
-  },
-  dayLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 4,
-  },
-  dateLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  scrollGrid: {
-    paddingVertical: 10,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
-  cell: {
-    width: COLUMN_WIDTH - 4,
-    height: 52,
-    marginHorizontal: 2,
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 2,
-  },
-  cellText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  cellTextLeft: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
-    paddingLeft: 8,
-    alignSelf: 'flex-start',
-  },
-  /* カラーバリエーション */
-  bgTeal: { backgroundColor: '#06b6d4' },
-  bgLime: { backgroundColor: '#a3e635' },
-  bgOrange: { backgroundColor: '#ca8a04' },
-  bgEmpty: { backgroundColor: 'transparent' },
-  bgEmptyLime: { backgroundColor: '#fef08a', opacity: 0.3 },
-  bgEmptyText: { backgroundColor: '#e2e8f0', opacity: 0.4 },
-  bgPinkLight: { backgroundColor: '#fce7f3' },
-  /* フッター */
-  footer: {
-    height: 60,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  footerIcon: {
-    width: 24,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: 4,
-    marginBottom: 2,
-  },
-  footerText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-});

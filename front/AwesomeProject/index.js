@@ -11,6 +11,7 @@ import { SettingsProvider } from './setting/SettingsContext';
 import HomeScreen from './Home';
 import Setting from './Setting';
 import AccountScreen from './Account';
+import ScheduleScreen from './Schedule';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +29,7 @@ function App() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Settings" component={Setting} />
           <Stack.Screen name="Account" component={AccountScreen} />
+          <Stack.Screen name="Schedule" component={ScheduleScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       </SettingsProvider>
