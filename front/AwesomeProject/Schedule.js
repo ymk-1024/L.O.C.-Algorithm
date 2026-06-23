@@ -152,15 +152,18 @@ export default function Schedule({ navigation }) {
   const rawEvents = isEvenWeek ? SCHEDULE_EVENTS_EVEN : SCHEDULE_EVENTS_ODD;
 
   // 同時間帯の予定重なり（衝突）を判定し、横並びにするレイアウト計算
+  // 同時間帯の予定重なり（衝突）を判定し、横並びにするレイアウト計算
   const processOverlaps = (eventsList) => {
     const daysEvents = Array.from({ length: 7 }, () => []);
     eventsList.forEach((e) => {
-      const rowSpan = Math.max(1, Math.round(e.hours / 2));
+      const startRow = Number(e.rowIndex);
+      const hours = Number(e.hours);
+      const rowSpan = Math.max(1, Math.round(hours / 2));
       daysEvents[e.dayIndex].push({
         ...e,
         rowSpan,
-        startRow: e.rowIndex,
-        endRow: e.rowIndex + rowSpan,
+        startRow,
+        endRow: startRow + rowSpan,
         overlapIndex: 0,
         overlapCount: 1,
       });
