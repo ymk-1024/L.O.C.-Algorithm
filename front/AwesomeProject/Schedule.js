@@ -13,84 +13,89 @@ const gridWidth = width - marginHorizontal * 2 - gridBoxPadding - timeColWidth;
 const colWidth = gridWidth / 7;
 const cardHeight = 62;
 
-// 時間軸ラベルの定義 (行インデックス0〜6に対応)
+// 時間軸ラベルの定義 (00:00〜22:00の12行構成)
 const TIME_LABELS = [
-  '09:00',
-  '11:00',
-  '13:00',
-  '15:00',
-  '17:00',
-  '19:00',
-  '21:00'
+  '00:00',
+  '02:00',
+  '04:00',
+  '06:00',
+  '08:00',
+  '10:00',
+  '12:00',
+  '14:00',
+  '16:00',
+  '18:00',
+  '20:00',
+  '22:00'
 ];
 
 const colors = {
-  green1: { bg: '#1E3D37', text: '#FFFFFF' }, // 1時間 (深緑)
-  green2: { bg: '#2D5C52', text: '#FFFFFF' }, // 2時間
-  green3: { bg: '#4A7C72', text: '#FFFFFF' }, // 3時間
-  green4: { bg: '#70968F', text: '#FFFFFF' }, // 4時間
-  green5: { bg: '#8FAEA6', text: '#1E3D37' }, // 5時間
-  gray:   { bg: '#7E8B93', text: '#FFFFFF' }, // 6時間 (グレー)
+  green1: { bg: '#E8F0EC', bar: '#3B5E4F', text: '#3B5E4F' }, // セージ
+  green2: { bg: '#FDF0ED', bar: '#C86A53', text: '#C86A53' }, // テラコッタ
+  green3: { bg: '#EDF3F6', bar: '#5A8296', text: '#5A8296' }, // ダスティブルー
+  green4: { bg: '#FDF7EA', bar: '#C69E4B', text: '#C69E4B' }, // マスタード
+  green5: { bg: '#F6EFF4', bar: '#8E6B82', text: '#8E6B82' }, // モーブ
+  gray:   { bg: '#F0F2F4', bar: '#6E7A8A', text: '#6E7A8A' }, // スレートグレー
   empty:  { bg: '#F4F5F7', border: '#E5E5EA' }, // 空白
 };
 
 // スケジュールデータ（縦長バーティカル構造）
 // dayIndex: 0 (月) 〜 6 (日)
-// rowIndex: 0 (09:00), 1 (11:00), 2 (13:00), 3 (15:00), 4 (17:00), 5 (19:00), 6 (21:00)
+// rowIndex: 0 (00:00), 1 (02:00), 2 (04:00), 3 (06:00), 4 (08:00), 5 (10:00), 6 (12:00), 7 (14:00), 8 (16:00), 9 (18:00), 10 (20:00), 11 (22:00)
 // hours: 予定の長さ。rowSpan = Math.max(1, Math.round(hours / 2))
 const SCHEDULE_EVENTS_EVEN = [
   // 月曜
-  { dayIndex: 0, rowIndex: 0, hours: 2, time: '09:00 - 11:00', type: 'green1' },
-  { dayIndex: 0, rowIndex: 2, hours: 3, time: '13:00 - 16:00', type: 'green3' },
-  { dayIndex: 0, rowIndex: 5, hours: 4, time: '19:00 - 23:00', type: 'green4' },
+  { dayIndex: 0, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
+  { dayIndex: 0, rowIndex: 6, hours: 3, time: '12:00 - 15:00', type: 'green3' },
+  { dayIndex: 0, rowIndex: 9, hours: 4, time: '18:00 - 22:00', type: 'green4' },
   
-  // 火曜〜土曜のデイリー予定 (元々の span: 5 予定を各曜日に縦長配置)
-  { dayIndex: 1, rowIndex: 3, hours: 4, time: '15:00 - 19:00', type: 'green5' },
-  { dayIndex: 2, rowIndex: 3, hours: 4, time: '15:00 - 19:00', type: 'green5' },
-  { dayIndex: 3, rowIndex: 3, hours: 4, time: '15:00 - 19:00', type: 'green5' },
-  { dayIndex: 4, rowIndex: 3, hours: 4, time: '15:00 - 19:00', type: 'green5' },
-  { dayIndex: 5, rowIndex: 3, hours: 4, time: '15:00 - 19:00', type: 'green5' },
+  // 火曜〜土曜のデイリー予定 (16:00 - 20:00)
+  { dayIndex: 1, rowIndex: 8, hours: 4, time: '16:00 - 20:00', type: 'green5' },
+  { dayIndex: 2, rowIndex: 8, hours: 4, time: '16:00 - 20:00', type: 'green5' },
+  { dayIndex: 3, rowIndex: 8, hours: 4, time: '16:00 - 20:00', type: 'green5' },
+  { dayIndex: 4, rowIndex: 8, hours: 4, time: '16:00 - 20:00', type: 'green5' },
+  { dayIndex: 5, rowIndex: 8, hours: 4, time: '16:00 - 20:00', type: 'green5' },
 
   // その他予定
-  { dayIndex: 1, rowIndex: 0, hours: 2, time: '09:00 - 11:00', type: 'green1' },
-  { dayIndex: 1, rowIndex: 1, hours: 2, time: '11:00 - 13:00', type: 'green2' },
-  { dayIndex: 1, rowIndex: 6, hours: 2, time: '21:00 - 23:00', type: 'gray' },
+  { dayIndex: 1, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
+  { dayIndex: 1, rowIndex: 5, hours: 2, time: '10:00 - 12:00', type: 'green2' },
+  { dayIndex: 1, rowIndex: 10, hours: 2, time: '20:00 - 22:00', type: 'gray' },
 
-  { dayIndex: 2, rowIndex: 5, hours: 3, time: '19:00 - 22:00', type: 'green3' },
+  { dayIndex: 2, rowIndex: 9, hours: 3, time: '18:00 - 21:00', type: 'green3' },
 
-  { dayIndex: 3, rowIndex: 0, hours: 2, time: '09:00 - 11:00', type: 'green1' },
-  { dayIndex: 3, rowIndex: 1, hours: 2, time: '11:00 - 13:00', type: 'green2' },
+  { dayIndex: 3, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
+  { dayIndex: 3, rowIndex: 5, hours: 2, time: '10:00 - 12:00', type: 'green2' },
 
-  { dayIndex: 4, rowIndex: 0, hours: 2, time: '09:00 - 11:00', type: 'green1' },
-  { dayIndex: 4, rowIndex: 5, hours: 2, time: '19:00 - 21:00', type: 'green2' },
+  { dayIndex: 4, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
+  { dayIndex: 4, rowIndex: 9, hours: 2, time: '18:00 - 20:00', type: 'green2' },
 
-  { dayIndex: 5, rowIndex: 0, hours: 2, time: '09:00 - 11:00', type: 'green1' },
-  { dayIndex: 5, rowIndex: 5, hours: 2, time: '19:00 - 21:00', type: 'green2' },
+  { dayIndex: 5, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
+  { dayIndex: 5, rowIndex: 9, hours: 2, time: '18:00 - 20:00', type: 'green2' },
 
-  { dayIndex: 6, rowIndex: 0, hours: 2, time: '09:00 - 11:00', type: 'green1' },
+  { dayIndex: 6, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
 ];
 
 const SCHEDULE_EVENTS_ODD = [
   // 奇数週
-  { dayIndex: 0, rowIndex: 1, hours: 4, time: '11:00 - 15:00', type: 'green2' },
-  { dayIndex: 0, rowIndex: 4, hours: 6, time: '17:00 - 23:00', type: 'gray' },
+  { dayIndex: 0, rowIndex: 5, hours: 4, time: '10:00 - 14:00', type: 'green2' },
+  { dayIndex: 0, rowIndex: 8, hours: 6, time: '16:00 - 22:00', type: 'gray' },
   
-  { dayIndex: 1, rowIndex: 2, hours: 2, time: '13:00 - 15:00', type: 'green3' },
-  { dayIndex: 1, rowIndex: 5, hours: 4, time: '19:00 - 23:00', type: 'green5' },
+  { dayIndex: 1, rowIndex: 6, hours: 2, time: '12:00 - 14:00', type: 'green3' },
+  { dayIndex: 1, rowIndex: 9, hours: 4, time: '18:00 - 22:00', type: 'green5' },
 
   // 水曜〜金曜にまたがっていた予定を個別に縦長配置
-  { dayIndex: 2, rowIndex: 0, hours: 4, time: '09:00 - 13:00', type: 'green4' },
-  { dayIndex: 3, rowIndex: 0, hours: 4, time: '09:00 - 13:00', type: 'green4' },
-  { dayIndex: 4, rowIndex: 0, hours: 4, time: '09:00 - 13:00', type: 'green4' },
+  { dayIndex: 2, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
+  { dayIndex: 3, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
+  { dayIndex: 4, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
 
-  { dayIndex: 2, rowIndex: 3, hours: 2, time: '15:00 - 17:00', type: 'green1' },
-  { dayIndex: 4, rowIndex: 4, hours: 2, time: '17:00 - 19:00', type: 'green2' },
+  { dayIndex: 2, rowIndex: 7, hours: 2, time: '14:00 - 16:00', type: 'green1' },
+  { dayIndex: 4, rowIndex: 8, hours: 2, time: '16:00 - 18:00', type: 'green2' },
 
-  { dayIndex: 5, rowIndex: 1, hours: 4, time: '11:00 - 15:00', type: 'green3' },
-  { dayIndex: 5, rowIndex: 3, hours: 4, time: '15:00 - 19:00', type: 'green4' },
+  { dayIndex: 5, rowIndex: 5, hours: 4, time: '10:00 - 14:00', type: 'green3' },
+  { dayIndex: 5, rowIndex: 7, hours: 4, time: '14:00 - 18:00', type: 'green4' },
 
-  { dayIndex: 6, rowIndex: 0, hours: 2, time: '09:00 - 11:00', type: 'green1' },
-  { dayIndex: 6, rowIndex: 5, hours: 4, time: '19:00 - 23:00', type: 'gray' },
+  { dayIndex: 6, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
+  { dayIndex: 6, rowIndex: 9, hours: 4, time: '18:00 - 22:00', type: 'gray' },
 ];
 
 export default function Schedule({ navigation }) {
@@ -263,7 +268,7 @@ export default function Schedule({ navigation }) {
                     key={index}
                     activeOpacity={0.8}
                     style={[
-                      tw`rounded-[8px] p-[2px] justify-center items-center absolute`,
+                      tw`rounded-[8px] absolute flex-row overflow-hidden border border-black/5`,
                       {
                         left: event.dayIndex * colWidth + 2,
                         top: event.rowIndex * cardHeight + 2,
@@ -274,17 +279,23 @@ export default function Schedule({ navigation }) {
                       }
                     ]}
                   >
-                    <Text
-                      style={[
-                        tw`font-bold text-center leading-[11px]`,
-                        {
-                          fontSize: rowSpan > 1 ? 10 : 8,
-                          color: colorScheme.text,
-                        }
-                      ]}
-                    >
-                      {displayTime}
-                    </Text>
+                    {/* 左端のカラーバー */}
+                    <View style={{ width: 3, height: '100%', backgroundColor: colorScheme.bar }} />
+                    
+                    {/* 時刻表示 */}
+                    <View style={tw`flex-1 justify-center items-center p-[2px]`}>
+                      <Text
+                        style={[
+                          tw`font-bold text-center leading-[11px]`,
+                          {
+                            fontSize: rowSpan > 1 ? 10 : 8,
+                            color: colorScheme.text,
+                          }
+                        ]}
+                      >
+                        {displayTime}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
