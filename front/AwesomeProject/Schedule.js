@@ -9,8 +9,7 @@ const { width } = Dimensions.get('window');
 const marginHorizontal = 16;
 const gridBoxPadding = 24; // p-3 (12px左右で計24px)
 const timeColWidth = 45; // 時間軸ラベルの幅
-const gridWidth = width - marginHorizontal * 2 - gridBoxPadding - timeColWidth;
-const colWidth = gridWidth / 7;
+const colWidth = 75; // 1列の幅を75pxに固定し、横スクロールによるスライド対応とする
 const cardHeight = 62;
 
 // 時間軸ラベルの定義 (00:00〜22:00の12行構成)
@@ -40,9 +39,6 @@ const colors = {
 };
 
 // スケジュールデータ（縦長バーティカル構造）
-// dayIndex: 0 (月) 〜 6 (日)
-// rowIndex: 0 (00:00), 1 (02:00), 2 (04:00), 3 (06:00), 4 (08:00), 5 (10:00), 6 (12:00), 7 (14:00), 8 (16:00), 9 (18:00), 10 (20:00), 11 (22:00)
-// hours: 予定の長さ。rowSpan = Math.max(1, Math.round(hours / 2))
 const SCHEDULE_EVENTS_EVEN = [
   // 月曜
   { dayIndex: 0, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
@@ -83,7 +79,7 @@ const SCHEDULE_EVENTS_ODD = [
   { dayIndex: 1, rowIndex: 6, hours: 2, time: '12:00 - 14:00', type: 'green3' },
   { dayIndex: 1, rowIndex: 9, hours: 4, time: '18:00 - 22:00', type: 'green5' },
 
-  // 水曜〜金曜にまたがっていた予定を個別に縦長配置
+  // 水曜〜金曜
   { dayIndex: 2, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
   { dayIndex: 3, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
   { dayIndex: 4, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
@@ -195,112 +191,120 @@ export default function Schedule({ navigation }) {
         {/* Schedule Grid Box */}
         <View style={tw`bg-white rounded-[24px] p-3 shadow-sm border border-[#EAEAEA]`}>
           
-          {/* Days Header */}
-          <View style={tw`flex-row border-b border-[#F2F2F7] pb-3 mb-2`}>
-            <View style={{ width: timeColWidth }} />
-            {getDays().map((day) => (
-              <View key={day.key} style={{ width: colWidth, alignItems: 'center' }}>
-                <Text style={tw`text-[13px] font-medium text-[#7E8B93] mb-1`}>{day.label}</Text>
-                <View style={[
-                  tw`w-7 h-7 rounded-full items-center justify-center`,
-                  day.isToday && tw`bg-[#1E3D37]`
-                ]}>
-                  <Text style={[
-                    tw`text-[15px] font-bold`,
-                    day.isToday ? tw`text-white` : tw`text-[#1C1C1E]`
-                  ]}>
-                    {day.date}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* Grid Layout Container */}
-          <View style={tw`flex-row relative`}>
-            
-            {/* Y軸: 時間軸ラベル */}
-            <View style={{ width: timeColWidth, justifyContent: 'space-between', paddingVertical: 4 }}>
-              {TIME_LABELS.map((label, index) => (
-                <View key={index} style={{ height: cardHeight, justifyContent: 'flex-start' }}>
-                  <Text style={tw`text-[11px] font-semibold text-[#8E8E93] text-right pr-2`}>
-                    {label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            {/* グリッド本体 (背景破線枠 + absoluteイベント) */}
-            <View style={{ flex: 1, height: cardHeight * 7, position: 'relative' }}>
-              
-              {/* 背景破線グリッド */}
-              <View style={tw`absolute inset-0 flex-row`}>
-                {Array.from({ length: 7 }).map((_, colIndex) => (
-                  <View key={colIndex} style={{ width: colWidth }}>
-                    {Array.from({ length: 7 }).map((_, rowIndex) => (
-                      <View
-                        key={rowIndex}
-                        style={[
-                          tw`rounded-[8px] border border-dashed`,
-                          {
-                            height: cardHeight - 4,
-                            margin: 2,
-                            backgroundColor: colors.empty.bg,
-                            borderColor: colors.empty.border,
-                          }
-                        ]}
-                      />
-                    ))}
+          <View style={tw`flex-row`}>
+            {/* 左端: 固定時間軸ラベル */}
+            <View style={{ width: timeColWidth, paddingTop: 46 }}>
+              <View style={{ justifyContent: 'space-between', height: cardHeight * TIME_LABELS.length, paddingVertical: 4 }}>
+                {TIME_LABELS.map((label, index) => (
+                  <View key={index} style={{ height: cardHeight, justifyContent: 'flex-start' }}>
+                    <Text style={tw`text-[11px] font-semibold text-[#8E8E93] text-right pr-2`}>
+                      {label}
+                    </Text>
                   </View>
                 ))}
               </View>
+            </View>
 
-              {/* スケジュールカード (Absolute レイヤー) */}
-              {events.map((event, index) => {
-                const colorScheme = colors[event.type] || colors.green1;
-                // hours（予定の長さ）に応じて縦方向のコマ数（rowSpan）を計算
-                const rowSpan = Math.max(1, Math.round(event.hours / 2));
-                // 狭い列幅でも崩れないよう、ハイフン区切りを改行に置換
-                const displayTime = event.time.replace(' - ', '\n');
+            {/* 右側: 横スクロール可能なスケジュールグリッド */}
+            <ScrollView
+              horizontal={true}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ width: colWidth * 7 }}
+            >
+              <View style={{ flex: 1 }}>
+                
+                {/* 曜日ヘッダー */}
+                <View style={tw`flex-row border-b border-[#F2F2F7] pb-3 mb-2`}>
+                  {getDays().map((day) => (
+                    <View key={day.key} style={{ width: colWidth, alignItems: 'center' }}>
+                      <Text style={tw`text-[13px] font-medium text-[#7E8B93] mb-1`}>{day.label}</Text>
+                      <View style={[
+                        tw`w-7 h-7 rounded-full items-center justify-center`,
+                        day.isToday && tw`bg-[#1E3D37]`
+                      ]}>
+                        <Text style={[
+                          tw`text-[15px] font-bold`,
+                          day.isToday ? tw`text-white` : tw`text-[#1C1C1E]`
+                        ]}>
+                          {day.date}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
 
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    activeOpacity={0.8}
-                    style={[
-                      tw`rounded-[8px] absolute flex-row overflow-hidden border border-black/5`,
-                      {
-                        left: event.dayIndex * colWidth + 2,
-                        top: event.rowIndex * cardHeight + 2,
-                        width: colWidth - 4, // 横は1日分に固定
-                        height: rowSpan * cardHeight - 4, // 縦の時間を hours に応じて伸ばす
-                        backgroundColor: colorScheme.bg,
-                        zIndex: 10,
-                      }
-                    ]}
-                  >
-                    {/* 左端のカラーバー */}
-                    <View style={{ width: 3, height: '100%', backgroundColor: colorScheme.bar }} />
-                    
-                    {/* 時刻表示 */}
-                    <View style={tw`flex-1 justify-center items-center p-[2px]`}>
-                      <Text
+                {/* グリッド本体 (背景破線枠 + absoluteイベント) */}
+                <View style={{ height: cardHeight * TIME_LABELS.length, position: 'relative' }}>
+                  
+                  {/* 背景破線グリッド */}
+                  <View style={tw`absolute inset-0 flex-row`}>
+                    {Array.from({ length: 7 }).map((_, colIndex) => (
+                      <View key={colIndex} style={{ width: colWidth }}>
+                        {Array.from({ length: TIME_LABELS.length }).map((_, rowIndex) => (
+                          <View
+                            key={rowIndex}
+                            style={[
+                              tw`rounded-[8px] border border-dashed`,
+                              {
+                                height: cardHeight - 4,
+                                margin: 2,
+                                backgroundColor: colors.empty.bg,
+                                borderColor: colors.empty.border,
+                              }
+                            ]}
+                          />
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* スケジュールカード (Absolute レイヤー) */}
+                  {events.map((event, index) => {
+                    const colorScheme = colors[event.type] || colors.green1;
+                    const rowSpan = Math.max(1, Math.round(event.hours / 2));
+                    // 幅が広くなったので ' - ' を ' ~ ' に置き換えて見やすく折り返し
+                    const displayTime = event.time.replace(' - ', '\n~ ');
+
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        activeOpacity={0.8}
                         style={[
-                          tw`font-bold text-center leading-[11px]`,
+                          tw`rounded-[8px] absolute flex-row overflow-hidden border border-black/5`,
                           {
-                            fontSize: rowSpan > 1 ? 10 : 8,
-                            color: colorScheme.text,
+                            left: event.dayIndex * colWidth + 2,
+                            top: event.rowIndex * cardHeight + 2,
+                            width: colWidth - 4, // 横は1日分に固定
+                            height: rowSpan * cardHeight - 4,
+                            backgroundColor: colorScheme.bg,
+                            zIndex: 10,
                           }
                         ]}
                       >
-                        {displayTime}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                        {/* 左端のカラーバー */}
+                        <View style={{ width: 3, height: '100%', backgroundColor: colorScheme.bar }} />
+                        
+                        {/* 時刻表示 */}
+                        <View style={tw`flex-1 justify-center items-center p-[2px]`}>
+                          <Text
+                            style={[
+                              tw`font-bold text-center leading-[11px]`,
+                              {
+                                fontSize: rowSpan > 1 ? 10 : 8,
+                                color: colorScheme.text,
+                              }
+                            ]}
+                          >
+                            {displayTime}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
 
-            </View>
+                </View>
+              </View>
+            </ScrollView>
           </View>
 
         </View>
