@@ -384,6 +384,43 @@ class LOCBleManager {
     }
   }
 
+  // Trigger a short vibration test command on the physical or virtual device
+  async triggerVibrationTest() {
+    if (isVirtualMode) {
+      console.log('[BLE Sync] Virtual transmitting vibration test command (NUS command)...');
+      console.log('  -> write: "vibrate\\n"');
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          console.log('[BLE Sync] Vibration test command successfully sent (virtual write success).');
+          resolve();
+        }, 300);
+      });
+    } else {
+      if (!this.connectedDevice) {
+        throw new Error('No device connected via BLE.');
+      }
+      
+      console.log('[BLE Sync] Preparing NUS vibration test command...');
+      const cmd = 'vibrate\n';
+      
+      try {
+        console.log(`[BLE Write Command] Sending: ${cmd.trim()}`);
+        const rxUuid = CHARACTERISTIC_UUID;
+        const base64Cmd = utf8ToBase64(cmd);
+        
+        await this.connectedDevice.writeCharacteristicWithResponseForService(
+          SERVICE_UUID,
+          rxUuid,
+          base64Cmd
+        );
+        console.log('[BLE Sync] Vibration test command sent successfully (physical).');
+      } catch (error) {
+        console.warn(`[BLE Sync] Direct write vibration failed: ${error.message}.`);
+        throw error;
+      }
+    }
+  }
+
   // Scan for Wi-Fi networks via connected device (simulated or real)
   async scanWifi() {
     const baseNetworks = [

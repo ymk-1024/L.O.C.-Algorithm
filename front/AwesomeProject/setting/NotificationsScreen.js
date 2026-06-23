@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, Switch, Vibration } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import tw from 'twrnc';
 import { useSettings } from './SettingsContext';
 import DetailHeader from './DetailHeader';
+import { bleManager } from '../utils/bleManager';
 
 export default function NotificationsScreen({ navigation }) {
   const { settings, updateSetting } = useSettings();
@@ -14,6 +15,24 @@ export default function NotificationsScreen({ navigation }) {
     { id: 'Alert', label: 'アラート' },
     { id: 'Silent', label: 'サイレント' },
   ];
+
+  const handleVibrationTest = async () => {
+    // 1. スマホ自身を振動させる (500ms)
+    Vibration.vibrate(500);
+
+    // 2. ペアリング済みのBLEデバイスがあれば、BLE経由で振動コマンドも送る
+    try {
+      const bleState = bleManager.getConnectionState();
+      if (bleState.isConnected) {
+        console.log('[Vibration Test] Device is connected. Triggering device vibration...');
+        await bleManager.triggerVibrationTest();
+      } else {
+        console.log('[Vibration Test] Device is not connected. Skipping device vibration test.');
+      }
+    } catch (error) {
+      console.warn('[Vibration Test] Failed to trigger device vibration over BLE:', error);
+    }
+  };
 
   return (
     <SafeAreaView style={tw`flex-1 bg-[#F7F9FB]`}>
@@ -56,6 +75,16 @@ export default function NotificationsScreen({ navigation }) {
                   thumbColor={settings.notifications.vibrationEnabled ? '#1E3D37' : '#FFFFFF'}
                 />
               </View>
+              {settings.notifications.vibrationEnabled && (
+                <TouchableOpacity
+                  onPress={handleVibrationTest}
+                  style={tw`mt-4 bg-[#F4F6F5] border border-[#CDE5E0] py-3 rounded-[12px] items-center justify-center`}
+                >
+                  <Text style={tw`text-[15px] font-bold text-[#1E3D37]`}>
+                    振動テストを実行 (スマホ・デバイス)
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {settings.notifications.soundEnabled && (
