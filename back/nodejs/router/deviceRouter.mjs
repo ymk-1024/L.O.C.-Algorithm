@@ -17,12 +17,7 @@ device.post('/issue-token',
   deviceHandler.issueOwnerToken
 );
 
-// 通常のデバイス登録（App 経由）
-device.post('/',
-  authMiddleware.autoRefreshAuth,
-  validateDeviceCreation,
-  deviceHandler.createDevice
-);
+
 
 device.put('/:uuid',
   authMiddleware.autoRefreshAuth,
@@ -45,6 +40,42 @@ device.post('/self-register',
 device.post('/token/refresh',
   ownerTokenMiddleware.verifyOwnerToken,
   deviceHandler.refreshOwnerToken
+);
+
+// ポーリング用
+device.get('/polling',
+  ownerTokenMiddleware.verifyOwnerToken,
+  deviceHandler.polling
+);
+
+// 自己ステータス送信
+device.post('/status',
+  ownerTokenMiddleware.verifyOwnerToken,
+  deviceHandler.updateDeviceStatus
+);
+
+// デバイス設定取得
+device.get('/settings',
+  ownerTokenMiddleware.verifyOwnerToken,
+  deviceHandler.getDeviceSettings
+);
+
+// 生存確認 (ping)
+device.get('/ping',
+  ownerTokenMiddleware.verifyOwnerToken,
+  deviceHandler.ping
+);
+
+// コマンド詳細取得
+device.get('/command/:id',
+  ownerTokenMiddleware.verifyOwnerToken,
+  deviceHandler.getCommandDetails
+);
+
+// 実行確認 (ACK)
+device.get('/command/:id/ack',
+  ownerTokenMiddleware.verifyOwnerToken,
+  deviceHandler.ackCommand
 );
 
 export default device;
