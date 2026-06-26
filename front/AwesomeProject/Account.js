@@ -99,7 +99,7 @@ export default function AccountScreen({ navigation }) {
             <Text style={tw`text-[24px] font-bold text-[#1C1C1E]`}>{userInfo.username}</Text>
             <Text style={tw`text-[15px] text-[#7E8B93] mt-1`}>{userInfo.email}</Text>
             {/* Debug information overlay */}
-            {debugInfo.error && (
+            {__DEV__ && debugInfo.error && (
               <View style={tw`mt-3 p-2 bg-red-50 border border-red-200 rounded-lg w-full`}>
                 <Text style={tw`text-red-600 text-[11px] text-center`}>API Error: {debugInfo.error}</Text>
                 <Text style={tw`text-gray-500 text-[9px] text-center mt-1`}>URL: {debugInfo.url}</Text>
