@@ -111,9 +111,29 @@ export default function WifiSettingScreen({ navigation }) {
 
   const handleConnect = (ssid) => {
     setCustomSsid(ssid);
-    setCustomPassword('');
+    const savedPass = bleManager.getWifiPassword(ssid);
+    setCustomPassword(savedPass);
     setIsManualAdd(false);
     setShowAddModal(true);
+  };
+
+  const handleOpenManualAdd = async () => {
+    setIsManualAdd(true);
+    setCustomPassword('');
+    setShowAddModal(true);
+    try {
+      const currentSsid = await bleManager.getCurrentWifiSsid();
+      if (currentSsid) {
+        setCustomSsid(currentSsid);
+        const savedPass = bleManager.getWifiPassword(currentSsid);
+        setCustomPassword(savedPass);
+      } else {
+        setCustomSsid('');
+      }
+    } catch (e) {
+      console.warn('[BLE Wi-Fi] Failed to get current SSID:', e);
+      setCustomSsid('');
+    }
   };
 
   const handleConnectCustom = async () => {
@@ -134,6 +154,7 @@ export default function WifiSettingScreen({ navigation }) {
     
     try {
       updateSetting(['wifi'], updatedWifi);
+      bleManager.saveWifiCredentials(customSsid, customPassword);
       Alert.alert('送信成功', `Wi-Fi設定（SSID: ${customSsid}）をデバイスに流し込みました。`);
     } catch (e) {
       console.warn('[Wifi Sync Error]', e);
@@ -252,10 +273,7 @@ export default function WifiSettingScreen({ navigation }) {
               {isConnectedDevice && !isScanning && (
                 <TouchableOpacity
                   style={tw`flex-row items-center justify-center py-4 border-t border-[#F2F2F7] mt-2`}
-                  onPress={() => {
-                    setIsManualAdd(true);
-                    setShowAddModal(true);
-                  }}
+                  onPress={handleOpenManualAdd}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="add-circle-outline" size={20} color="#1E3D37" />
@@ -357,7 +375,13 @@ export default function WifiSettingScreen({ navigation }) {
               placeholder="SSIDを入力してください"
               placeholderTextColor="#8E8E93"
               value={customSsid}
-              onChangeText={setCustomSsid}
+              onChangeText={(text) => {
+                setCustomSsid(text);
+                const savedPass = bleManager.getWifiPassword(text);
+                if (savedPass) {
+                  setCustomPassword(savedPass);
+                }
+              }}
               autoCapitalize="none"
               autoCorrect={false}
               editable={isManualAdd}

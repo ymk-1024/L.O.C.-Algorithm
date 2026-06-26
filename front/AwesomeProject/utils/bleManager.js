@@ -478,7 +478,44 @@ class LOCBleManager {
       });
     }
   }
+
+  // Get currently connected Wi-Fi SSID from native or mock fallback
+  async getCurrentWifiSsid() {
+    if (isVirtualMode) {
+      return 'StandUpGuardian_5G';
+    } else {
+      try {
+        const WifiModule = NativeModules.WifiModule;
+        if (WifiModule && WifiModule.getCurrentWifiSsid) {
+          const ssid = await WifiModule.getCurrentWifiSsid();
+          console.log('[BLE Wi-Fi] Retrieved current connected SSID from Native:', ssid);
+          return ssid;
+        }
+      } catch (error) {
+        console.warn('[BLE Wi-Fi] Failed to retrieve current SSID via native:', error);
+      }
+      return 'StandUpGuardian_5G'; // Default fallback
+    }
+  }
+
+  saveWifiCredentials(ssid, password) {
+    if (ssid && password) {
+      knownWifiProfiles[ssid] = password;
+      console.log(`[BLE Credentials] Saved password for SSID: ${ssid}`);
+    }
+  }
+
+  getWifiPassword(ssid) {
+    if (ssid && knownWifiProfiles[ssid]) {
+      console.log(`[BLE Credentials] Found saved password for SSID: ${ssid}`);
+      return knownWifiProfiles[ssid];
+    }
+    return '';
+  }
 }
+
+let knownWifiProfiles = {};
+
 
 let knownSsids = [];
 
