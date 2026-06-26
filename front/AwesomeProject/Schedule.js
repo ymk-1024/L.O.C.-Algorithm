@@ -236,7 +236,7 @@ export default function Schedule({ navigation }) {
     <View style={tw`flex-1 bg-[#F7F9FB]`}>
       <AppHeader />
 
-      <ScrollView contentContainerStyle={tw`px-[${marginHorizontal}px] pb-6`}>
+      <ScrollView contentContainerStyle={tw`px-[${marginHorizontal}px] pb-6`} scrollEnabled={true}>
         {/* Title Banner */}
         <View style={tw`bg-[#EAF6F3] rounded-[20px] py-4 px-6 mb-4 items-center`}>
           <Text style={tw`text-[26px] font-bold text-[#1E3D37]`}>スケジュール</Text>
