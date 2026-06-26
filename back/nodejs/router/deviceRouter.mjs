@@ -8,7 +8,9 @@ const device = Router();
 
 // ─── 読み取り系：認証不要 ────────────────────────────
 device.get('/',        deviceHandler.getAllDevices);
-device.get('/:uuid',  deviceHandler.getDeviceById);
+
+// 注意: /:uuid のようなワイルドカードルートは、他の固定ルート（/pingなど）より後に定義する必要があります。
+// ファイル末尾に移動しました。
 
 // ─── App 向け（ユーザーJWT認証必要） ────────────────────
 // App がデバイスの OwnerToken を申請する
@@ -19,15 +21,7 @@ device.post('/issue-token',
 
 
 
-device.put('/:uuid',
-  authMiddleware.autoRefreshAuth,
-  deviceHandler.updateDevice
-);
-
-device.delete('/:uuid',
-  authMiddleware.autoRefreshAuth,
-  deviceHandler.deleteDevice
-);
+// 注意: PUT /:uuid や DELETE /:uuid についても、念のためファイル末尾に移動しました。
 
 // ─── デバイス向け（OwnerToken 認証必要） ──────────────
 // デバイスが自己登録する（ハードウェアが叩く）
@@ -76,6 +70,19 @@ device.get('/command/:id',
 device.get('/command/:id/ack',
   ownerTokenMiddleware.verifyOwnerToken,
   deviceHandler.ackCommand
+);
+
+// ─── ワイルドカードルート (/:uuid) は最後に定義 ─────────
+device.get('/:uuid',  deviceHandler.getDeviceById);
+
+device.put('/:uuid',
+  authMiddleware.autoRefreshAuth,
+  deviceHandler.updateDevice
+);
+
+device.delete('/:uuid',
+  authMiddleware.autoRefreshAuth,
+  deviceHandler.deleteDevice
 );
 
 export default device;

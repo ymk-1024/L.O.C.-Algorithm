@@ -7,17 +7,17 @@
 @baseUrl = http://localhost:3005/api/v1.0
 
 ### ▼ 0. 変数の定義（実行後に手動で書き換える）
-@userUuid    = 
-@deviceUuid  = 
+@userUuid    = 019f0181-5c7f-7370-b1a2-092c85bfe094
+@deviceUuid  = my-custom-device-uuid-1234
 @sitUuid     = 
 @actUuid     = 
 @scheduleUuid = 
 
 ### ▼ ログイン後にレスポンスの accessToken をここに貼る（App通信用）
-@accessToken = 
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTlmMDE4MS01YzdmLTczNzAtYjFhMi0wOTJjODViZmUwOTQiLCJpYXQiOjE3ODI0MzY3MTAsImV4cCI6MTc4MjQzODUxMH0.bdPYSnArt0dIe2l9WzFYg7f8plzHGpkEKhyONoNOyh0
 
 ### ▼ デバイス登録後にレスポンスの OwnerToken をここに貼る（デバイス通信用）
-@ownerToken = 
+@ownerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTlmMDE4MS01YzdmLTczNzAtYjFhMi0wOTJjODViZmUwOTQiLCJuYW1lIjoi44K744Oz44K144O8MeWPtyIsInR5cGUiOiJvd25lciIsImlhdCI6MTc4MjQzNjg1MCwiZXhwIjoxNzg1MDI4ODUwfQ.wl3tJY5zs8_95jHUpVIWdSXtcPHQxcdYinWdkWB4GSs
 
 ### ===================================================
 ### 1. サーバー疎通確認
