@@ -278,8 +278,9 @@ class LOCBleManager {
       if (settings.wifi && settings.wifi.connectedSsid) {
         console.log(`  -> write: "ssid ${settings.wifi.connectedSsid}\\n"`);
       }
-      if (settings.wifi && settings.wifi.password) {
-        console.log(`  -> write: "pass [PROTECTED]\\n"`);
+      if (settings.wifi && settings.wifi.password !== undefined && settings.wifi.password !== null) {
+        const maskedLog = settings.wifi.password ? '[PROTECTED]' : '';
+        console.log(`  -> write: "pass ${maskedLog}\\n"`);
       }
       const token = settings.token || (settings.device && settings.device.token);
       if (token) {
@@ -303,7 +304,7 @@ class LOCBleManager {
       if (settings.wifi && settings.wifi.connectedSsid) {
         commands.push(`ssid ${settings.wifi.connectedSsid}\n`);
       }
-      if (settings.wifi && settings.wifi.password) {
+      if (settings.wifi && settings.wifi.password !== undefined && settings.wifi.password !== null) {
         commands.push(`pass ${settings.wifi.password}\n`);
       }
       const token = settings.token || (settings.device && settings.device.token);
@@ -424,7 +425,7 @@ class LOCBleManager {
   // Scan for Wi-Fi networks via connected device (simulated or real)
   async scanWifi() {
     const baseNetworks = [
-      { ssid: 'StandUpGuardian_5G', secure: true, signal: 4 },
+      { ssid: 'StandUpGuardian_2.4G', secure: true, signal: 4 },
       { ssid: 'buffalo-g-8A30', secure: true, signal: 3 },
       { ssid: 'aterm-102g-x', secure: true, signal: 4 },
       { ssid: 'direct-smart-tv-9a', secure: true, signal: 2 },
@@ -482,7 +483,7 @@ class LOCBleManager {
   // Get currently connected Wi-Fi SSID from native or mock fallback
   async getCurrentWifiSsid() {
     if (isVirtualMode) {
-      return 'StandUpGuardian_5G';
+      return 'StandUpGuardian_2.4G';
     } else {
       try {
         const WifiModule = NativeModules.WifiModule;
@@ -494,14 +495,14 @@ class LOCBleManager {
       } catch (error) {
         console.warn('[BLE Wi-Fi] Failed to retrieve current SSID via native:', error);
       }
-      return 'StandUpGuardian_5G'; // Default fallback
+      return 'StandUpGuardian_2.4G'; // Default fallback
     }
   }
 
   saveWifiCredentials(ssid, password) {
-    if (ssid && password) {
+    if (ssid && password !== undefined && password !== null) {
       knownWifiProfiles[ssid] = password;
-      console.log(`[BLE Credentials] Saved password for SSID: ${ssid}`);
+      console.log(`[BLE Credentials] Saved password for SSID: ${ssid} (length: ${password.length})`);
     }
   }
 

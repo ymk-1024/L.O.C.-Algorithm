@@ -109,12 +109,45 @@ export default function WifiSettingScreen({ navigation }) {
     { value: 30, label: '30秒' },
   ];
 
-  const handleConnect = (ssid) => {
+  const triggerDirectConnect = async (ssid, password) => {
+    addKnownSsid(ssid);
+    const updatedWifi = {
+      ...settings.wifi,
+      connectedSsid: ssid,
+      password: password || '',
+    };
+    try {
+      updateSetting(['wifi'], updatedWifi);
+      bleManager.saveWifiCredentials(ssid, password || '');
+      Alert.alert('送信成功', `Wi-Fi設定（SSID: ${ssid}）をデバイスに流し込みました。`);
+    } catch (e) {
+      console.warn('[Wifi Sync Error]', e);
+      Alert.alert('送信失敗', `設定の流し込みに失敗しました: ${e.message}`);
+    }
+  };
+
+  const handleConnect = (ssid, secure = true) => {
     setCustomSsid(ssid);
-    const savedPass = bleManager.getWifiPassword(ssid);
-    setCustomPassword(savedPass);
-    setIsManualAdd(false);
-    setShowAddModal(true);
+    if (!secure) {
+      setCustomPassword('');
+      setIsManualAdd(false);
+      Alert.alert(
+        'Wi-Fi接続',
+        `パスワード不要のネットワーク「${ssid}」に接続し、設定を流し込みますか？`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '接続・流し込み',
+            onPress: () => triggerDirectConnect(ssid, '')
+          }
+        ]
+      );
+    } else {
+      const savedPass = bleManager.getWifiPassword(ssid);
+      setCustomPassword(savedPass);
+      setIsManualAdd(false);
+      setShowAddModal(true);
+    }
   };
 
   const handleOpenManualAdd = async () => {
@@ -124,9 +157,14 @@ export default function WifiSettingScreen({ navigation }) {
     try {
       const currentSsid = await bleManager.getCurrentWifiSsid();
       if (currentSsid) {
-        setCustomSsid(currentSsid);
-        const savedPass = bleManager.getWifiPassword(currentSsid);
-        setCustomPassword(savedPass);
+        if (currentSsid.toLowerCase().includes('5g')) {
+          console.warn('[BLE Wi-Fi] Connected SSID is 5GHz. Skipping auto-fill:', currentSsid);
+          setCustomSsid('');
+        } else {
+          setCustomSsid(currentSsid);
+          const savedPass = bleManager.getWifiPassword(currentSsid);
+          setCustomPassword(savedPass);
+        }
       } else {
         setCustomSsid('');
       }
@@ -139,6 +177,14 @@ export default function WifiSettingScreen({ navigation }) {
   const handleConnectCustom = async () => {
     if (!customSsid) {
       Alert.alert('入力エラー', 'SSIDを入力してください。');
+      return;
+    }
+
+    if (customSsid.toLowerCase().includes('5g')) {
+      Alert.alert(
+        '入力エラー',
+        'このデバイスは 2.4GHz 帯の Wi-Fi にのみ対応しています。5GHz帯のWi-Fi（SSIDに"5G"等が含まれるもの）は設定できません。2.4GHzのSSIDを入力してください。'
+      );
       return;
     }
     
@@ -154,7 +200,7 @@ export default function WifiSettingScreen({ navigation }) {
     
     try {
       updateSetting(['wifi'], updatedWifi);
-      bleManager.saveWifiCredentials(customSsid, customPassword);
+      bleManager.saveWifiCredentials(customSsid, customPassword || '');
       Alert.alert('送信成功', `Wi-Fi設定（SSID: ${customSsid}）をデバイスに流し込みました。`);
     } catch (e) {
       console.warn('[Wifi Sync Error]', e);
@@ -252,7 +298,7 @@ export default function WifiSettingScreen({ navigation }) {
                     <TouchableOpacity
                       key={net.ssid}
                       style={tw`flex-row items-center justify-between py-[18px] ${!isLast ? 'border-b border-[#EAEAEA]' : ''}`}
-                      onPress={() => handleConnect(net.ssid)}
+                      onPress={() => handleConnect(net.ssid, net.secure)}
                     >
                       <View style={tw`flex-row items-center`}>
                         <Ionicons
