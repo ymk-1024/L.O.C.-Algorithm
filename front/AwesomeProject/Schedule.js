@@ -1,10 +1,5 @@
-<<<<<<< HEAD
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, Modal, Alert } from 'react-native';
-=======
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
->>>>>>> 7b9997400e1fa5fdcf7a7e9705aafbb496de3928
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
 import AppHeader from './AppHeader';
