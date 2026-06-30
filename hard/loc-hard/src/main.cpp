@@ -8,6 +8,9 @@
 #include <BLE2902.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <ArduinoJson.h>
+#include "config.h"
+#include "apis.h"
 
 #define POWER_LED      2
 #define STATUS_LED     4
@@ -25,9 +28,6 @@
 #define EXPAND_PIN2    33
 #define SENSOR_IN      34
 #define CONFIG_RESET   13
-
-// バックエンドサーバーのベースURL (実環境に合わせて変更可能)
-#define BACKEND_BASE_URL "http://localhost:3000" 
 
 const int freq = 5000;
 const int resolution = 8;
@@ -272,156 +272,7 @@ String loadPassword() {
 // ====================
 // Security & API Communication
 // ====================
-
-// ランダムなnonceを生成する
-String generateNonce() {
-    String charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    String nonce = "";
-    for (int i = 0; i < 16; i++) {
-        nonce += charset[esp_random() % charset.length()];
-    }
-    return nonce;
-}
-
-// サーバーへ共通ヘッダを付与したHTTPリクエストを送信するヘルパー関数
-bool sendApiRequest(const String& path, const String& method, const String& payload, String& response) {
-    if (WiFi.status() != WL_CONNECTED) {
-        return false;
-    }
-
-    WiFiClient client; // 実運用時は WiFiClientSecure と証明書検証を使用
-    HTTPClient http;
-    String url = String(BACKEND_BASE_URL) + path;
-    
-    http.begin(client, url);
-    
-    // 設計仕様書に定義されている共通ヘッダの追加
-    String nonce = generateNonce();
-    // 本来はNTPで同期したUNIX時間を使用。ここでは代替としてmillis()を使用
-    String timestamp = String(millis() / 1000 + 1700000000); 
-
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Nonce", nonce);
-    http.addHeader("X-Timestamp", timestamp);
-    http.addHeader("X-Device-UUID", myDeviceUUID);
-    
-    if (!myOwnerToken.isEmpty()) {
-        http.addHeader("Authorization", "Bearer " + myOwnerToken);
-    }
-
-    int httpCode = -1;
-    if (method == "POST") {
-        httpCode = http.POST(payload);
-    } else if (method == "GET") {
-        httpCode = http.GET();
-    } else if (method == "PUT") {
-        httpCode = http.PUT(payload);
-    }
-
-    if (httpCode > 0) {
-        response = http.getString();
-        Serial.printf("[HTTP] %s to %s response: %d\n", method.c_str(), path.c_str(), httpCode);
-        http.end();
-        return (httpCode >= 200 && httpCode < 300);
-    } else {
-        Serial.printf("[HTTP] %s failed, error: %s\n", method.c_str(), http.errorToString(httpCode).c_str());
-        http.end();
-        return false;
-    }
-}
-
-// デバイスの自己登録
-bool registerDevice() {
-    if (myOwnerToken.isEmpty()) {
-        Serial.println("Skipping registration: OwnerToken is empty.");
-        return false;
-    }
-
-    Serial.println("Registering device on server...");
-    
-    // 設計書と現状のバックエンドスキーマを想定したペイロード
-    String payload = "{\"userUuid\":\"" + myOwnerToken + "\",\"name\":\"LOC-Device\",\"type\":\"cushion\",\"status\":\"active\"}";
-    String response = "";
-    
-    if (sendApiRequest("/api/v1.0/device", "POST", payload, response)) {
-        setRegisteredState(true);
-        return true;
-    }
-    return false;
-}
-
-// サーバーへの定期ポーリングと状態送信
-void pollServer() {
-    if (WiFi.status() != WL_CONNECTED || !isRegistered) {
-        return;
-    }
-
-    Serial.println("Polling server for events...");
-    
-    int seatState = sensor.readValue(); // 着座状態 (1 = 着座, 0 = 起立 など)
-    
-    // ポーリングパス。クエリで現在の着座状態も送信
-    String path = "/api/v1.0/sit_data?status=" + String(seatState);
-    String response = "";
-
-    if (sendApiRequest(path, "GET", "", response)) {
-        // レスポンスの簡易パース (それっぽく制御を分岐)
-        // 本来はArduinoJsonを使用しますが、文字列検索で対応します
-        
-        // 1. 振動イベントの検知
-        if (response.indexOf("\"vibrate\":true") != -1 || response.indexOf("\"vibrate\": 1") != -1) {
-            Serial.println("Vibration event triggered by server!");
-            isVibrating = true;
-            vibrationStartTime = millis();
-            setAllMotorsSpeed(200); // モーター起動
-        }
-        
-        // 2. 動的ポーリング間隔の変更検知 (ミリ秒指定)
-        if (response.indexOf("\"interval\":") != -1) {
-            int idx = response.indexOf("\"interval\":");
-            // 簡単な数値抽出
-            String intervalStr = "";
-            for (size_t i = idx + 11; i < response.length(); i++) {
-                char c = response[i];
-                if (c >= '0' && c <= '9') {
-                    intervalStr += c;
-                } else if (intervalStr.length() > 0) {
-                    break;
-                }
-            }
-            if (intervalStr.length() > 0) {
-                pollInterval = intervalStr.toInt();
-                Serial.printf("Polling interval changed to: %d ms\n", pollInterval);
-            }
-        } else {
-            // 設計書要件「次回イベント時刻に近づいた場合は1秒間隔に切り替える」のモック実装
-            if (response.indexOf("\"nextEventTime\":") != -1) {
-                int idx = response.indexOf("\"nextEventTime\":");
-                String nextTimeStr = "";
-                for (size_t i = idx + 16; i < response.length(); i++) {
-                    char c = response[i];
-                    if (c >= '0' && c <= '9') {
-                        nextTimeStr += c;
-                    } else if (nextTimeStr.length() > 0) {
-                        break;
-                    }
-                }
-                if (nextTimeStr.length() > 0) {
-                    long long nextEventTime = atoll(nextTimeStr.c_str());
-                    long long currentTime = millis() / 1000 + 1700000000;
-                    long long diff = nextEventTime - currentTime;
-                    
-                    if (diff > 0 && diff < 30) { // イベントまで30秒未満
-                        pollInterval = 1000; // 1秒ポーリングに切り替え
-                        Serial.println("Event approaching. Switched to 1s polling interval.");
-                    } else {
-                        pollInterval = 10000; // 通常の10秒間隔
-                    }
-                }
-            }
-        }
-    }
-}
+// (API functions are now implemented in apis.h)
 
 // ====================
 // BLE Management (Nordic UART Service)
@@ -559,6 +410,12 @@ void processBleCommand(const String& input) {
     } else if (input == "owner") {
         String currentOwner = bleOwnerToken.isEmpty() ? myOwnerToken : bleOwnerToken;
         blePrintln("Owner UUID: " + currentOwner);
+    } else if (input == "update") {
+        if (updateOwnerToken()) {
+            blePrintln("Token update success");
+        } else {
+            blePrintln("Token update failed");
+        }
     } else {
         blePrintln("Unknown command: " + input);
     }
@@ -648,21 +505,28 @@ bool connectWiFi() {
     String ssid = loadSSID();
     String pass = loadPassword();
 
-    if (ssid.isEmpty())
+    if (ssid.isEmpty()) {
+        Serial.println("[WiFi] No SSID configured.");
         return false;
+    }
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), pass.c_str());
+    Serial.printf("[WiFi] Connecting to SSID: %s ", ssid.c_str());
 
     unsigned long startTime = millis();
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        if (millis() - startTime > 15000)
+        Serial.print(".");
+        if (millis() - startTime > 15000) {
+            Serial.println("\n[WiFi] Connection timeout.");
             return false;
+        }
     }
 
-    Serial.println("WiFi Connected");
+    Serial.println("\n[WiFi] Connected successfully.");
+    Serial.print("[WiFi] IP Address: ");
     Serial.println(WiFi.localIP());
     return true;
 }
@@ -735,6 +599,8 @@ void setup() {
         if (!connectWiFi()) {
             Serial.println("Initial Wi-Fi connection failed. Proceeding to normal mode to retry in background.");
         } else {
+            // 時刻同期
+            initNTP();
             // Wi-Fi接続成功時、未登録なら自己登録
             if (!isRegistered) {
                 registerDevice();
@@ -754,6 +620,7 @@ void loop() {
             setAllMotorsSpeed(0); // モーター停止
             isVibrating = false;
             Serial.println("Vibration finished.");
+            sendExecutionAck("success"); // 実行完了を通知
         }
     }
 
@@ -768,6 +635,7 @@ void loop() {
             blePrintln("  token <token>    - Set OwnerToken");
             blePrintln("  uuid             - Show device identifier UUID");
             blePrintln("  owner            - Show owner UUID");
+            blePrintln("  update           - Request token update");
             blePrintln("  save             - Save and reboot");
             blePrintln("  cancel           - Exit");
             oldDeviceConnected = deviceConnected;
@@ -798,12 +666,25 @@ void loop() {
         
         // 未登録かつWi-Fi接続済みの場合は自己登録を試みる
         if (WiFi.status() == WL_CONNECTED && !isRegistered) {
+            static bool ntpInitDone = false;
+            if (!ntpInitDone) {
+                initNTP();
+                ntpInitDone = true;
+            }
             registerDevice();
+        }
+        
+        // 着座状態の変化を監視しログ出力
+        static int lastSeatState = -1;
+        int currentSeatState = sensor.readValue();
+        if (currentSeatState != lastSeatState) {
+            Serial.printf("[State Change] Seat State changed from %d to %d\n", lastSeatState, currentSeatState);
+            lastSeatState = currentSeatState;
         }
         
         // サーバーへの定期ポーリング処理
         if (millis() - lastPollTime >= pollInterval) {
-            pollServer();
+            pollServer(currentSeatState);
             lastPollTime = millis();
         }
         

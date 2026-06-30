@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, Modal, Alert } from 'react-native';
+=======
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+>>>>>>> 7b9997400e1fa5fdcf7a7e9705aafbb496de3928
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'twrnc';
 import AppHeader from './AppHeader';
@@ -42,7 +47,6 @@ const colors = {
 const SCHEDULE_EVENTS_EVEN = [
   // 月曜
   { dayIndex: 0, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
-  { dayIndex: 0, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green2' }, // 重なりテスト
   { dayIndex: 0, rowIndex: 6, hours: 3, time: '12:00 - 15:00', type: 'green3' },
   { dayIndex: 0, rowIndex: 9, hours: 4, time: '18:00 - 22:00', type: 'green4' },
   
@@ -58,16 +62,12 @@ const SCHEDULE_EVENTS_EVEN = [
   { dayIndex: 1, rowIndex: 5, hours: 2, time: '10:00 - 12:00', type: 'green2' },
   { dayIndex: 1, rowIndex: 10, hours: 2, time: '20:00 - 22:00', type: 'gray' },
 
-  { dayIndex: 2, rowIndex: 9, hours: 3, time: '18:00 - 21:00', type: 'green3' },
-
   { dayIndex: 3, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
   { dayIndex: 3, rowIndex: 5, hours: 2, time: '10:00 - 12:00', type: 'green2' },
 
   { dayIndex: 4, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
-  { dayIndex: 4, rowIndex: 9, hours: 2, time: '18:00 - 20:00', type: 'green2' },
 
   { dayIndex: 5, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
-  { dayIndex: 5, rowIndex: 9, hours: 2, time: '18:00 - 20:00', type: 'green2' },
 
   { dayIndex: 6, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' },
 ];
@@ -83,7 +83,6 @@ const SCHEDULE_EVENTS_ODD = [
   // 水曜〜金曜
   { dayIndex: 2, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
   { dayIndex: 3, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
-  { dayIndex: 3, rowIndex: 4, hours: 2, time: '08:00 - 10:00', type: 'green1' }, // 重なりテスト
   { dayIndex: 4, rowIndex: 4, hours: 4, time: '08:00 - 12:00', type: 'green4' },
 
   { dayIndex: 2, rowIndex: 7, hours: 2, time: '14:00 - 16:00', type: 'green1' },
@@ -275,6 +274,16 @@ export default function Schedule({ navigation }) {
     gridScrollRef.current?.scrollTo({ x, animated: false });
   };
 
+  // 横スクロールScrollViewを操作するためのRef
+  const horizontalScrollViewRef = useRef(null);
+
+  // 選択中の日付を管理するState（初期値：今日）
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  });
+
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
     const day = today.getDay();
@@ -284,17 +293,40 @@ export default function Schedule({ navigation }) {
     return monday;
   });
 
+  // 選択された日付の変更を検知して、該当する曜日の列位置まで自動スクロール
+  useEffect(() => {
+    const diffTime = selectedDate.getTime() - currentWeekStart.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // 現在表示している週の範囲内（0〜6）であればスクロール実行
+    if (diffDays >= 0 && diffDays < 7) {
+      horizontalScrollViewRef.current?.scrollTo({
+        x: diffDays * colWidth,
+        animated: true,
+      });
+    }
+  }, [selectedDate, currentWeekStart]);
+
   const changeWeek = (offsetWeeks) => {
     const nextMonday = new Date(currentWeekStart);
     nextMonday.setDate(currentWeekStart.getDate() + offsetWeeks * 7);
     setCurrentWeekStart(nextMonday);
+
+    // 週を切り替えた際、選択中の日付も1週間ずらすことで選択状態を維持
+    const nextSelected = new Date(selectedDate);
+    nextSelected.setDate(selectedDate.getDate() + offsetWeeks * 7);
+    setSelectedDate(nextSelected);
   };
 
   const setTodayWeek = () => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setSelectedDate(today);
+
+    // 修正箇所: currentWeekStartを一度「現在の週の月曜日」のタイムスタンプに戻してから更新する
     const day = today.getDay();
     const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(today.setDate(diff));
+    const monday = new Date(new Date().setDate(diff)); // 完全に新しく作り直して参照の狂いを防ぐ
     monday.setHours(0, 0, 0, 0);
     setCurrentWeekStart(monday);
   };
@@ -303,6 +335,11 @@ export default function Schedule({ navigation }) {
     const year = currentWeekStart.getFullYear();
     const month = currentWeekStart.getMonth() + 1;
     return `${year}年 ${month}月`;
+  };
+
+  // タップ時に選択中の日付を更新する関数
+  const handleDayPress = (day) => {
+    setSelectedDate(day.fullDate);
   };
 
   const getDays = () => {
@@ -314,11 +351,14 @@ export default function Schedule({ navigation }) {
       const date = new Date(currentWeekStart);
       date.setDate(currentWeekStart.getDate() + i);
       const isToday = date.getTime() === today.getTime();
+      const isSelected = date.getTime() === selectedDate.getTime();
       return {
         key: i,
         label: weekdays[i],
         date: date.getDate().toString(),
+        fullDate: date,
         isToday,
+        isSelected,
       };
     });
   };
@@ -458,20 +498,25 @@ export default function Schedule({ navigation }) {
           >
             <View style={tw`flex-row border-b border-[#F2F2F7] pb-3 mb-1`}>
               {getDays().map((day) => (
-                <View key={day.key} style={{ width: colWidth, alignItems: 'center' }}>
+                <TouchableOpacity
+                  key={day.key}
+                  style={{ width: colWidth, alignItems: 'center' }}
+                  onPress={() => handleDayPress(day)}
+                  activeOpacity={0.7}
+                >
                   <Text style={tw`text-[13px] font-medium text-[#7E8B93] mb-1`}>{day.label}</Text>
                   <View style={[
                     tw`w-7 h-7 rounded-full items-center justify-center`,
-                    day.isToday && tw`bg-[#1E3D37]`
+                    day.isSelected ? tw`bg-[#1E3D37]` : (day.isToday ? tw`bg-[#1E3D37]/10` : null)
                   ]}>
                     <Text style={[
                       tw`text-[15px] font-bold`,
-                      day.isToday ? tw`text-white` : tw`text-[#1C1C1E]`
+                      day.isSelected ? tw`text-white` : (day.isToday ? tw`text-[#1E3D37]` : tw`text-[#1C1C1E]`)
                     ]}>
                       {day.date}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           </ScrollView>

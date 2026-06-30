@@ -83,11 +83,11 @@ export default function AccountScreen({ navigation }) {
       {/* 共通ヘッダー */}
       <AppHeader />
 
-      <ScrollView contentContainerStyle={tw`px-5 pb-24`} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={tw`px-5 pb-24`} showsVerticalScrollIndicator={false} scrollEnabled={false}>
         {/* メインのコンテナカード */}
-        <View style={tw`bg-white rounded-[24px] p-5 mt-[10px] shadow-sm`}>
+        <View style={tw`bg-white rounded-[24px] p-5 mt-[14px] shadow-sm`}>
           {/* 「アカウント」ヘッダー帯 */}
-          <View style={tw`bg-[#EAF6F3] rounded-[16px] py-[14px] px-5 mb-6`}>
+          <View style={tw`bg-[#EAF6F3] rounded-[16px] py-[10.5px] px-5 mb-6`}>
             <Text style={tw`text-[28px] font-bold text-[#1E3D37]`}>アカウント</Text>
           </View>
 

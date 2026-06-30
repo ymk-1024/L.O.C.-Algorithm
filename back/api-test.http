@@ -6,28 +6,32 @@
 
 @baseUrl = http://localhost:3005/api/v1.0
 
-### ▼ UUIDをここに記録して使い回す（実行後に手動で書き換える）
-@userUuid    = 019ef217-a372-73e9-91d8-debec49d5f18
-@deviceUuid  = デバイスが自分で生成したUUID
+### ▼ 0. 変数の定義（実行後に手動で書き換える）
+@userUuid    = 019f0181-5c7f-7370-b1a2-092c85bfe094
+@deviceUuid  = my-custom-device-uuid-1234
 @sitUuid     = 
 @actUuid     = 
+@scheduleUuid = 
 
-### ▼ 2-1ログイン後にレスポンスの accessToken をここに貼る
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTllZjIxNy1hMzcyLTczZTktOTFkOC1kZWJlYzQ5ZDVmMTgiLCJpYXQiOjE3ODIxNzgxODksImV4cCI6MTc4MjE3OTk4OX0.KwrDk53fTH1ivQzExOEmln_xhXHv28WZJTtYj7USfz8
+### ▼ ログイン後にレスポンスの accessToken をここに貼る（App通信用）
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTlmMDE4MS01YzdmLTczNzAtYjFhMi0wOTJjODViZmUwOTQiLCJpYXQiOjE3ODI0MzY3MTAsImV4cCI6MTc4MjQzODUxMH0.bdPYSnArt0dIe2l9WzFYg7f8plzHGpkEKhyONoNOyh0
+
+### ▼ デバイス登録後にレスポンスの OwnerToken をここに貼る（デバイス通信用）
+@ownerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTlmMDE4MS01YzdmLTczNzAtYjFhMi0wOTJjODViZmUwOTQiLCJuYW1lIjoi44K744Oz44K144O8MeWPtyIsInR5cGUiOiJvd25lciIsImlhdCI6MTc4MjQzNjg1MCwiZXhwIjoxNzg1MDI4ODUwfQ.wl3tJY5zs8_95jHUpVIWdSXtcPHQxcdYinWdkWB4GSs
+
 ### ===================================================
-### 0. サーバー疎通確認
+### 1. サーバー疎通確認
 ### ===================================================
 
-### 0-1. ヘルスチェック
+### 1-1. ヘルスチェック
 GET http://localhost:3005/
 
-
 ### ===================================================
-### 1. ユーザー (users)
+### 2. ユーザー (users)
 ### ===================================================
 
-### 1-1. ユーザー作成（認証不要）
-# ← 実行後、レスポンスの uuid を @userUuid に貼り付ける
+### 2-1. ユーザー作成（認証不要）
+# ← 実行後、レスポンスの data.uuid を @userUuid に貼り付ける
 POST {{baseUrl}}/users
 Content-Type: application/json
 
@@ -37,16 +41,13 @@ Content-Type: application/json
   "email": "test@example.com"
 }
 
-
-### 1-2. 全ユーザー取得
+### 2-2. 全ユーザー取得
 GET {{baseUrl}}/users
 
-
-### 1-3. UUID でユーザー取得
+### 2-3. UUID でユーザー取得
 GET {{baseUrl}}/users/{{userUuid}}
 
-
-### 1-4. ユーザー更新（要認証）
+### 2-4. ユーザー更新（要認証）
 PUT {{baseUrl}}/users/{{userUuid}}
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
@@ -56,17 +57,16 @@ Authorization: Bearer {{accessToken}}
   "email": "updated@example.com"
 }
 
-
-### 1-5. ユーザー削除（要認証）
+### 2-5. ユーザー削除（要認証）
 DELETE {{baseUrl}}/users/{{userUuid}}
 Authorization: Bearer {{accessToken}}
 
 
 ### ===================================================
-### 2. 認証 (auth)
+### 3. 認証 (auth)
 ### ===================================================
 
-### 2-1. ログイン
+### 3-1. ログイン
 # ← 実行後、レスポンスの data.accessToken を @accessToken に貼り付ける
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
@@ -76,63 +76,88 @@ Content-Type: application/json
   "password": "password123"
 }
 
-
-### 2-2. 自分の情報確認（認証チェック）
+### 3-2. 自分の情報確認（認証チェック）
 GET {{baseUrl}}/auth/me
 Authorization: Bearer {{accessToken}}
 
-
-### 2-3. ログアウト
+### 3-3. ログアウト
 POST {{baseUrl}}/auth/logout
 Authorization: Bearer {{accessToken}}
 
 
 ### ===================================================
-### 3. デバイス (device)
+### 4. デバイス登録・認証 (OwnerToken Flow)
 ### ===================================================
 
-### 3-1. デバイス登録（要認証）
-# ← 実行後、レスポンスの uuid を @deviceUuid に貼り付ける
-POST {{baseUrl}}/device
+### 4-1. OwnerToken 発行（Appから申請）
+# ← 実行後、レスポンスの data.ownerToken をコピーしてBLE経由でデバイスに渡す（ここでは手動で @ownerToken に貼る）
+POST {{baseUrl}}/device/issue-token
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
 
 {
-  "userUuid": "{{userUuid}}",
-  "name": "センサー1号",
-  "type": "sensor",
-  "status": "active"
+  "name": "センサー1号"
 }
 
-
-### 3-2. 全デバイス取得
-GET {{baseUrl}}/device
-
-
-### 3-3. UUID でデバイス取得
-GET {{baseUrl}}/device/{{deviceUuid}}
-
-
-### 3-4. デバイス更新（要認証）
-PUT {{baseUrl}}/device/{{deviceUuid}}
+### 4-2. デバイス自己登録（デバイスが叩く）
+# ← 実行後、レスポンスの data.uuid を @deviceUuid に貼り付ける
+POST {{baseUrl}}/device/self-register
 Content-Type: application/json
-Authorization: Bearer {{accessToken}}
+Authorization: OwnerToken {{ownerToken}}
 
 {
-  "status": "inactive"
+  "uuid": "my-custom-device-uuid-1234",
+  "model": "LOC-v1"
 }
 
-
-### 3-5. デバイス削除（要認証）
-DELETE {{baseUrl}}/device/{{deviceUuid}}
-Authorization: Bearer {{accessToken}}
+### 4-3. OwnerToken 更新（デバイスが叩く）
+POST {{baseUrl}}/device/token/refresh
+Authorization: OwnerToken {{ownerToken}}
 
 
 ### ===================================================
-### 4. 着席データ (sit_data)
+### 5. デバイス機能 (デバイスが叩くAPI)
 ### ===================================================
 
-### 4-1. 着席データ登録（要認証）
+### 5-1. 生存確認 (ping)
+GET {{baseUrl}}/device/ping
+Authorization: OwnerToken {{ownerToken}}
+
+### 5-2. ポーリング用 (間隔やコマンド取得)
+GET {{baseUrl}}/device/polling?is_sitting=true
+Authorization: OwnerToken {{ownerToken}}
+
+### 5-3. 自己ステータス送信
+POST {{baseUrl}}/device/status
+Content-Type: application/json
+Authorization: OwnerToken {{ownerToken}}
+
+{
+  "battery_level": 85,
+  "is_sitting": true,
+  "other_status": {
+    "firmware_version": "v1.2.3"
+  }
+}
+
+### 5-4. デバイス設定取得
+GET {{baseUrl}}/device/settings
+Authorization: OwnerToken {{ownerToken}}
+
+### 5-5. コマンド詳細取得 (IDは仮)
+GET {{baseUrl}}/device/command/1
+Authorization: OwnerToken {{ownerToken}}
+
+### 5-6. 実行確認(ACK) (IDは仮)
+GET {{baseUrl}}/device/command/1/ack
+Authorization: OwnerToken {{ownerToken}}
+
+
+### ===================================================
+### 6. 着席データ (sit_data)
+### ===================================================
+
+### 6-1. 着席データ登録（要認証）
 # ← 実行後、レスポンスの uuid を @sitUuid に貼り付ける
 POST {{baseUrl}}/sit_data
 Content-Type: application/json
@@ -142,27 +167,13 @@ Authorization: Bearer {{accessToken}}
   "deviceUuid": "{{deviceUuid}}"
 }
 
-
-### 4-2. 着席データ登録（終了時刻あり）
-POST {{baseUrl}}/sit_data
-Content-Type: application/json
-Authorization: Bearer {{accessToken}}
-
-{
-  "deviceUuid": "{{deviceUuid}}",
-  "endAt": "2025-06-16T13:00:00"
-}
-
-
-### 4-3. 全着席データ取得
+### 6-2. 全着席データ取得
 GET {{baseUrl}}/sit_data
 
-
-### 4-4. UUID で着席データ取得
+### 6-3. UUID で着席データ取得
 GET {{baseUrl}}/sit_data/{{sitUuid}}
 
-
-### 4-5. 着席データ更新（終了時刻を記録）（要認証）
+### 6-4. 着席データ更新（終了時刻を記録）（要認証）
 PUT {{baseUrl}}/sit_data/{{sitUuid}}
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
@@ -171,17 +182,16 @@ Authorization: Bearer {{accessToken}}
   "endAt": "2025-06-16T14:30:00"
 }
 
-
-### 4-6. 着席データ削除（要認証）
+### 6-5. 着席データ削除（要認証）
 DELETE {{baseUrl}}/sit_data/{{sitUuid}}
 Authorization: Bearer {{accessToken}}
 
 
 ### ===================================================
-### 5. 活動データ (activity_data)
+### 7. 活動データ (activity_data)
 ### ===================================================
 
-### 5-1. 活動データ登録（要認証）
+### 7-1. 活動データ登録（要認証）
 # ← 実行後、レスポンスの uuid を @actUuid に貼り付ける
 POST {{baseUrl}}/activity_data
 Content-Type: application/json
@@ -192,40 +202,55 @@ Authorization: Bearer {{accessToken}}
   "type": "walk"
 }
 
-
-### 5-2. 全活動データ取得
+### 7-2. 全活動データ取得
 GET {{baseUrl}}/activity_data
 
-
-### 5-3. UUID で活動データ取得
+### 7-3. UUID で活動データ取得
 GET {{baseUrl}}/activity_data/{{actUuid}}
 
-
-### 5-4. 活動データ削除（要認証）
+### 7-4. 活動データ削除（要認証）
 DELETE {{baseUrl}}/activity_data/{{actUuid}}
 Authorization: Bearer {{accessToken}}
 
 
+### ===================================================
+### 8. スケジュール (schedule)
+### ===================================================
 
-### OwnerToken 発行（App が叩く）
-POST http://localhost:3005/api/v1.0/device/issue-token
+### 8-1. スケジュール登録（要認証）
+# ← 実行後、レスポンスの uuid を @scheduleUuid に貼り付ける
+POST {{baseUrl}}/schedule
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
 
 {
-  "deviceUuid": "デバイスが自分で生成したUUID",
-  "name": "センサー1号"
+  "title": "授業",
+  "day_of_week": 1,
+  "start_time": "09:00",
+  "end_time": "10:30"
 }
 
-### デバイス自己登録（マイコンが叩く）
-POST http://localhost:3005/api/v1.0/device/self-register
+### 8-2. 全スケジュール取得（要認証）
+GET {{baseUrl}}/schedule
+Authorization: Bearer {{accessToken}}
+
+### 8-3. UUID でスケジュール取得（要認証）
+GET {{baseUrl}}/schedule/{{scheduleUuid}}
+Authorization: Bearer {{accessToken}}
+
+### 8-4. スケジュール更新（要認証）
+PUT {{baseUrl}}/schedule/{{scheduleUuid}}
 Content-Type: application/json
-Authorization: OwnerToken eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTllZjIxNy1hMzcyLTczZTktOTFkOC1kZWJlYzQ5ZDVmMTgiLCJkZXZpY2VfdXVpZCI6IuODh-ODkOOCpOOCueOBjOiHquWIhuOBp-eUn-aIkOOBl-OBn1VVSUQiLCJ0eXBlIjoib3duZXIiLCJpYXQiOjE3ODIxNzgyNDQsImV4cCI6MTc4NDc3MDI0NH0.TDjZN0jQmgCGtOyKH8gO4XKP28_DYKob-faPNMUIoiU
+Authorization: Bearer {{accessToken}}
 
 {
-  "model": "LOC-v1"
+  "title": "授業（変更後）",
+  "day_of_week": 2,
+  "start_time": "10:00",
+  "end_time": "11:30",
+  "is_active": true
 }
 
-### OwnerToken 更新（マイコンが叩く）
-POST http://localhost:3005/api/v1.0/device/token/refresh
-Authorization: OwnerToken eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX3V1aWQiOiIwMTllZjIxNy1hMzcyLTczZTktOTFkOC1kZWJlYzQ5ZDVmMTgiLCJkZXZpY2VfdXVpZCI6IuODh-ODkOOCpOOCueOBjOiHquWIhuOBp-eUn-aIkOOBl-OBn1VVSUQiLCJ0eXBlIjoib3duZXIiLCJpYXQiOjE3ODIxNzgyNDQsImV4cCI6MTc4NDc3MDI0NH0.TDjZN0jQmgCGtOyKH8gO4XKP28_DYKob-faPNMUIoiU
+### 8-5. スケジュール削除（要認証）
+DELETE {{baseUrl}}/schedule/{{scheduleUuid}}
+Authorization: Bearer {{accessToken}}

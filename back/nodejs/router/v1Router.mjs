@@ -4,6 +4,7 @@ import authRouter from "./authRouter.mjs";
 import deviceRouter from "./deviceRouter.mjs";
 import sitDataRouter from "./sitDataRouter.mjs";
 import activityDataRouter from "./activityDataRouter.mjs";
+import scheduleRouter from "./scheduleRouter.mjs";
 
 const v = Router();
 
@@ -12,5 +13,6 @@ v.use('/auth', authRouter);
 v.use('/device', deviceRouter);
 v.use('/sit_data', sitDataRouter);
 v.use('/activity_data', activityDataRouter);
+v.use('/schedule', scheduleRouter);
 
 export default v;
