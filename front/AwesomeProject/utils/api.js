@@ -34,5 +34,11 @@ export const getApiUrl = () => {
     return `http://${host}:3005/api/v1.0`;
   }
   
-  return envUrl.endsWith('/api/v1.0') ? envUrl : `${envUrl}/api/v1.0`;
+  if (envUrl.endsWith('/v1.0')) {
+    return envUrl;
+  }
+  if (envUrl.endsWith('/api')) {
+    return `${envUrl}/v1.0`;
+  }
+  return `${envUrl}/api/v1.0`;
 };
