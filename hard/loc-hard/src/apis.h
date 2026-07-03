@@ -18,6 +18,7 @@ extern bool isRegistered;
 extern unsigned long pollInterval;
 extern bool isVibrating;
 extern unsigned long vibrationStartTime;
+extern String activeCommandId;
 
 // ====================
 // Extern Helper Functions from main.cpp
@@ -111,7 +112,7 @@ inline bool sendApiRequest(const String& path, const String& method, const Strin
     http.addHeader("X-Device-UUID", myDeviceUUID);
     
     if (!myOwnerToken.isEmpty()) {
-        http.addHeader("Authorization", "Bearer " + myOwnerToken);
+        http.addHeader("Authorization", "OwnerToken " + myOwnerToken);
     }
 
     Serial.println("----------------------------------------");
@@ -120,7 +121,7 @@ inline bool sendApiRequest(const String& path, const String& method, const Strin
     Serial.printf("  X-Timestamp: %s\n", timestamp.c_str());
     Serial.printf("  X-Device-UUID: %s\n", myDeviceUUID.c_str());
     if (!myOwnerToken.isEmpty()) {
-        Serial.printf("  Authorization: Bearer %s\n", myOwnerToken.c_str());
+        Serial.printf("  Authorization: OwnerToken %s\n", myOwnerToken.c_str());
     }
     if (!payload.isEmpty()) {
         Serial.printf("  Payload: %s\n", payload.c_str());
@@ -159,16 +160,14 @@ inline bool registerDevice() {
     Serial.println("Registering device on server...");
     
     StaticJsonDocument<256> doc;
-    doc["userUuid"] = myOwnerToken;
-    doc["name"] = "LOC-Device";
-    doc["type"] = "cushion";
-    doc["status"] = "active";
+    doc["uuid"] = myDeviceUUID;
+    doc["model"] = "cushion";
     
     String payload;
     serializeJson(doc, payload);
     String response = "";
     
-    if (sendApiRequest("/api/v1.0/device", "POST", payload, response)) {
+    if (sendApiRequest("/api/v1.0/device/self-register", "POST", payload, response)) {
         setRegisteredState(true);
         return true;
     }
@@ -184,7 +183,8 @@ inline void pollServer(int seatState) {
     Serial.printf("Polling server for events (Seat State: %d)...\n", seatState);
     
     // ポーリングパス。現在の着座状態をクエリパラメータとして送信
-    String path = "/api/v1.0/sit_data?status=" + String(seatState);
+    String isSittingStr = (seatState == 1) ? "true" : "false";
+    String path = "/api/v1.0/device/polling?is_sitting=" + isSittingStr;
     String response = "";
 
     if (sendApiRequest(path, "GET", "", response)) {
@@ -196,29 +196,28 @@ inline void pollServer(int seatState) {
             return;
         }
 
-        // 1. 振動イベントの検知
-        if (doc.containsKey("vibrate") && (doc["vibrate"] == true || doc["vibrate"] == 1)) {
-            Serial.println("Vibration event triggered by server!");
-            isVibrating = true;
-            vibrationStartTime = millis();
-            setAllMotorsSpeed(200); // モーター起動
-        }
-        
-        // 2. 動的ポーリング間隔の変更検知
-        if (doc.containsKey("interval")) {
-            pollInterval = doc["interval"].as<unsigned long>();
-            Serial.printf("Polling interval changed to: %lu ms\n", pollInterval);
-        } else if (doc.containsKey("nextEventTime")) {
-            // イベント接近時に1秒間隔へ切り替える処理
-            unsigned long nextEventTime = doc["nextEventTime"].as<unsigned long>();
-            unsigned long currentTime = getUnixTime();
-            if (nextEventTime > currentTime) {
-                unsigned long diff = nextEventTime - currentTime;
-                if (diff < 30) { // イベントまで30秒未満
-                    pollInterval = 1000;
-                    Serial.println("Event approaching. Switched to 1s polling interval.");
-                } else {
-                    pollInterval = 10000; // 通常の10秒間隔
+        if (doc.containsKey("data")) {
+            JsonObject data = doc["data"];
+            
+            // 1. 動的ポーリング間隔の変更検知
+            if (data.containsKey("interval_ms")) {
+                pollInterval = data["interval_ms"].as<unsigned long>();
+                Serial.printf("Polling interval changed to: %lu ms\n", pollInterval);
+            }
+            
+            // 2. 振動イベント (pending_commands) の検知
+            if (data.containsKey("pending_commands") && data["pending_commands"].is<JsonArray>()) {
+                JsonArray pendingCommands = data["pending_commands"].as<JsonArray>();
+                for (JsonObject cmd : pendingCommands) {
+                    String cmdType = cmd["command_type"].as<String>();
+                    if (cmdType == "vibrate") {
+                        activeCommandId = cmd["id"].as<String>();
+                        Serial.printf("Vibration command received! Command ID: %s\n", activeCommandId.c_str());
+                        isVibrating = true;
+                        vibrationStartTime = millis();
+                        setAllMotorsSpeed(200); // モーター起動
+                        break; // 最初の振動コマンドのみ処理
+                    }
                 }
             }
         }
@@ -234,33 +233,31 @@ inline bool updateOwnerToken() {
 
     Serial.println("Requesting OwnerToken update...");
     
-    StaticJsonDocument<256> doc;
-    doc["currentOwnerToken"] = myOwnerToken;
-    doc["deviceUuid"] = myDeviceUUID;
-    doc["model"] = "cushion";
-    
-    String payload;
-    serializeJson(doc, payload);
     String response = "";
     
-    if (sendApiRequest("/api/v1.0/device/token", "POST", payload, response)) {
-        StaticJsonDocument<256> resDoc;
-        DeserializationError error = deserializeJson(resDoc, response);
-        if (!error && resDoc.containsKey("newToken")) {
-            String newToken = resDoc["newToken"].as<String>();
-            
-            // トークンの仮適用と疎通テスト
-            String backupToken = myOwnerToken;
-            myOwnerToken = newToken;
-            
-            Serial.println("Testing new OwnerToken...");
-            if (registerDevice()) { // 自己登録で疎通テストを代用
-                saveOwnerToken(newToken);
-                Serial.println("OwnerToken updated and saved successfully.");
-                return true;
+    if (sendApiRequest("/api/v1.0/device/token/refresh", "POST", "", response)) {
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, response);
+        if (!error && doc.containsKey("data")) {
+            JsonObject data = doc["data"];
+            if (data.containsKey("newOwnerToken")) {
+                String newToken = data["newOwnerToken"].as<String>();
+                
+                // トークンの仮適用と疎通テスト
+                String backupToken = myOwnerToken;
+                myOwnerToken = newToken;
+                
+                Serial.println("Testing new OwnerToken...");
+                if (registerDevice()) { // 自己登録で疎通テストを代用
+                    saveOwnerToken(newToken);
+                    Serial.println("OwnerToken updated and saved successfully.");
+                    return true;
+                } else {
+                    myOwnerToken = backupToken; // ロールバック
+                    Serial.println("New token verification failed. Reverted to old token.");
+                }
             } else {
-                myOwnerToken = backupToken; // ロールバック
-                Serial.println("New token verification failed. Reverted to old token.");
+                Serial.println("No newOwnerToken in response data.");
             }
         } else {
             Serial.println("Invalid response format for token update.");
@@ -270,19 +267,15 @@ inline bool updateOwnerToken() {
 }
 
 // 実行確認 ACK 送信機能
-inline bool sendExecutionAck(const String& status = "success") {
-    Serial.println("Sending execution ACK to server...");
-    
-    StaticJsonDocument<256> doc;
-    doc["deviceUuid"] = myDeviceUUID;
-    doc["status"] = status;
-    doc["timestamp"] = getUnixTime();
-    
-    String payload;
-    serializeJson(doc, payload);
+inline bool sendExecutionAck(const String& commandId) {
+    if (commandId.isEmpty()) {
+        Serial.println("Cannot send ACK: command ID is empty.");
+        return false;
+    }
+    Serial.printf("Sending execution ACK for Command ID %s to server...\n", commandId.c_str());
+    String path = "/api/v1.0/device/command/" + commandId + "/ack";
     String response = "";
-    
-    return sendApiRequest("/api/v1.0/device/ack", "POST", payload, response);
+    return sendApiRequest(path, "GET", "", response);
 }
 
 #endif // APIS_H

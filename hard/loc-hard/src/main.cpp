@@ -48,7 +48,6 @@ bool oldDeviceConnected = false;
 String rxBuffer = "";
 
 bool configMode = false;
-bool bleMode = false;
 String bleSSID = "";
 String blePassword = "";
 String bleOwnerToken = ""; // BLEから受信するOwnerToken用
@@ -62,6 +61,7 @@ unsigned long lastPollTime = 0;
 unsigned long pollInterval = 10000; // デフォルト10秒間隔
 bool isVibrating = false;
 unsigned long vibrationStartTime = 0;
+String activeCommandId = "";
 
 // ====================
 // Hardware Classes
@@ -324,15 +324,9 @@ void blePrintln(const String& msg) {
 }
 
 void startBleConfig() {
-    bleMode = true;
-    configMode = true;
     bleSSID = "";
     blePassword = "";
     bleOwnerToken = "";
-
-    WiFi.disconnect(true);
-    delay(100);
-    WiFi.mode(WIFI_OFF);
 
     // BLEの初期化
     BLEDevice::init("LOC-Controller");
@@ -567,6 +561,9 @@ void setup() {
     Serial.println("Device UUID: " + myDeviceUUID);
     Serial.println("Owner UUID: " + myOwnerToken);
 
+    // BLE設定モードは常にバックグラウンドで起動
+    startBleConfig();
+
     delay(100);
 
     if (configResetSw.isPressed()) {
@@ -574,12 +571,10 @@ void setup() {
         Serial.println("WiFi Config & Device Config Cleared");
         delay(500);
 
-        // 長押し: BLEモード
+        // 長押し: BLEモード (常に解放されているためそのまま進む)
         delay(2000);
         if (configResetSw.isPressed()) {
-            Serial.println("Entering BLE Config Mode");
-            startBleConfig();
-            return;
+            Serial.println("Entering BLE Config Mode (Always active, proceeding to loop)");
         } else {
             // Webサーバーモード
             Serial.println("Entering Web Config Mode");
@@ -590,9 +585,7 @@ void setup() {
 
     String ssid = loadSSID();
     if (ssid.isEmpty()) {
-        // 設定がない場合はBLEモードで設定を待つ
-        Serial.println("No Wi-Fi credentials. Starting BLE Config Mode...");
-        startBleConfig();
+        Serial.println("No Wi-Fi credentials. Waiting for BLE configuration...");
     } else {
         // 設定がある場合はWi-Fi接続を試みる
         Serial.println("Wi-Fi credentials found. Connecting...");
@@ -620,39 +613,37 @@ void loop() {
             setAllMotorsSpeed(0); // モーター停止
             isVibrating = false;
             Serial.println("Vibration finished.");
-            sendExecutionAck("success"); // 実行完了を通知
+            if (!activeCommandId.isEmpty()) {
+                sendExecutionAck(activeCommandId);
+                activeCommandId = ""; // クリア
+            }
         }
     }
 
-    if (bleMode) {
-        // BLE接続処理
-        if (deviceConnected && !oldDeviceConnected) {
-            delay(500); // 接続安定待ち
-            blePrintln("LOC Controller - WiFi Configuration");
-            blePrintln("Commands:");
-            blePrintln("  ssid <name>      - Set WiFi SSID");
-            blePrintln("  pass <password>  - Set WiFi Password");
-            blePrintln("  token <token>    - Set OwnerToken");
-            blePrintln("  uuid             - Show device identifier UUID");
-            blePrintln("  owner            - Show owner UUID");
-            blePrintln("  update           - Request token update");
-            blePrintln("  save             - Save and reboot");
-            blePrintln("  cancel           - Exit");
-            oldDeviceConnected = deviceConnected;
-        }
-        if (!deviceConnected && oldDeviceConnected) {
-            delay(500);
-            pServer->startAdvertising(); // アドバタイズ再開
-            Serial.println("Restarted BLE advertising");
-            oldDeviceConnected = deviceConnected;
-        }
+    // BLE接続処理 (常に解放・実行)
+    if (deviceConnected && !oldDeviceConnected) {
+        delay(500); // 接続安定待ち
+        blePrintln("LOC Controller - WiFi Configuration");
+        blePrintln("Commands:");
+        blePrintln("  ssid <name>      - Set WiFi SSID");
+        blePrintln("  pass <password>  - Set WiFi Password");
+        blePrintln("  token <token>    - Set OwnerToken");
+        blePrintln("  uuid             - Show device identifier UUID");
+        blePrintln("  owner            - Show owner UUID");
+        blePrintln("  update           - Request token update");
+        blePrintln("  save             - Save and reboot");
+        blePrintln("  cancel           - Exit");
+        oldDeviceConnected = deviceConnected;
+    }
+    if (!deviceConnected && oldDeviceConnected) {
+        delay(500);
+        pServer->startAdvertising(); // アドバタイズ再開
+        Serial.println("Restarted BLE advertising");
+        oldDeviceConnected = deviceConnected;
+    }
 
-        static uint32_t lastBlink = 0;
-        if (millis() - lastBlink > 500) {
-            statusLED.toggle();
-            lastBlink = millis();
-        }
-    } else if (configMode) {
+    if (configMode) {
+        // Web AP設定モード
         server.handleClient();
 
         static uint32_t lastBlink = 0;
@@ -662,7 +653,16 @@ void loop() {
         }
     } else {
         // 通常動作モード
-        statusLED.setState(true);
+        if (deviceConnected) {
+            // BLE接続中はインジケータとしてStatus LEDを早く点滅させる
+            static uint32_t lastBlink = 0;
+            if (millis() - lastBlink > 200) {
+                statusLED.toggle();
+                lastBlink = millis();
+            }
+        } else {
+            statusLED.setState(true);
+        }
         
         // 未登録かつWi-Fi接続済みの場合は自己登録を試みる
         if (WiFi.status() == WL_CONNECTED && !isRegistered) {
