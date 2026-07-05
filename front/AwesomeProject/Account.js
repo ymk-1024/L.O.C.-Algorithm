@@ -22,9 +22,11 @@ export default function AccountScreen({ navigation }) {
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [emailInput, setEmailInput] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [newUsername, setNewUsername] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -146,8 +148,8 @@ export default function AccountScreen({ navigation }) {
   };
 
   const handleRegisterSubmit = async () => {
-    if (!identifier || !password) {
-      Alert.alert('エラー', 'IDとパスワードを入力してください。');
+    if (!identifier || !password || !emailInput) {
+      Alert.alert('エラー', 'ID、パスワード、およびメールアドレスを入力してください。');
       return;
     }
     setIsLoggingIn(true);
@@ -159,7 +161,7 @@ export default function AccountScreen({ navigation }) {
         body: JSON.stringify({ 
           username: identifier, 
           password: password, 
-          email: `${identifier}@example.com` 
+          email: emailInput 
         })
       });
 
@@ -176,9 +178,9 @@ export default function AccountScreen({ navigation }) {
     }
   };
 
-  const handleUpdateUsername = async () => {
-    if (!newUsername.trim()) {
-      Alert.alert('エラー', 'ユーザー名を入力してください。');
+  const handleUpdateProfile = async () => {
+    if (!newUsername.trim() || !newEmail.trim()) {
+      Alert.alert('エラー', 'ユーザー名とメールアドレスを入力してください。');
       return;
     }
     if (!userInfo.uuid) return;
@@ -189,13 +191,13 @@ export default function AccountScreen({ navigation }) {
       const res = await fetch(`${apiUrl}/users/${userInfo.uuid}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: newUsername })
+        body: JSON.stringify({ username: newUsername, email: newEmail })
       });
       
       if (res.ok) {
-        setUserInfo(prev => ({ ...prev, username: newUsername }));
+        setUserInfo(prev => ({ ...prev, username: newUsername, email: newEmail }));
         setEditModalVisible(false);
-        Alert.alert('完了', 'ユーザー名を更新しました！');
+        Alert.alert('完了', 'プロフィールを更新しました！');
       } else {
         const errorData = await res.json();
         throw new Error(errorData.message || '更新に失敗しました');
@@ -266,6 +268,8 @@ export default function AccountScreen({ navigation }) {
               {isLoggedIn && (
                 <TouchableOpacity onPress={() => {
                   setNewUsername(userInfo.username);
+                  const displayEmail = (userInfo.email && userInfo.email.startsWith('ID:')) ? '' : userInfo.email;
+                  setNewEmail(displayEmail === 'Email未設定' ? '' : displayEmail);
                   setEditModalVisible(true);
                 }}>
                   <Ionicons name="pencil-outline" size={20} color="#1E3D37" />
@@ -356,12 +360,23 @@ export default function AccountScreen({ navigation }) {
 
             <Text style={tw`text-[14px] font-bold text-[#1C1C1E] mb-2 ml-1`}>パスワード</Text>
             <TextInput
-              style={tw`bg-[#F7F9FB] rounded-[12px] px-4 py-3 mb-6 text-[16px] text-[#1C1C1E] border border-[#EAEAEA]`}
+              style={tw`bg-[#F7F9FB] rounded-[12px] px-4 py-3 mb-4 text-[16px] text-[#1C1C1E] border border-[#EAEAEA]`}
               placeholder="パスワード"
               placeholderTextColor="#A0AEC0"
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+            />
+
+            <Text style={tw`text-[14px] font-bold text-[#1C1C1E] mb-2 ml-1`}>メールアドレス (新規登録時のみ)</Text>
+            <TextInput
+              style={tw`bg-[#F7F9FB] rounded-[12px] px-4 py-3 mb-6 text-[16px] text-[#1C1C1E] border border-[#EAEAEA]`}
+              placeholder="example@example.com"
+              placeholderTextColor="#A0AEC0"
+              value={emailInput}
+              onChangeText={setEmailInput}
+              autoCapitalize="none"
+              keyboardType="email-address"
             />
 
             <TouchableOpacity
@@ -394,15 +409,15 @@ export default function AccountScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* Edit Username Modal */}
+      {/* Edit Profile Modal */}
       <Modal visible={editModalVisible} transparent={true} animationType="fade">
         <View style={tw`flex-1 bg-black/50 justify-center items-center px-5`}>
           <View style={tw`bg-white rounded-[24px] w-full p-6 shadow-lg`}>
-            <Text style={tw`text-[22px] font-bold text-[#1E3D37] mb-2 text-center`}>ユーザー名の変更</Text>
+            <Text style={tw`text-[22px] font-bold text-[#1E3D37] mb-2 text-center`}>プロフィールの変更</Text>
             
             <Text style={tw`text-[14px] font-bold text-[#1C1C1E] mb-2 ml-1 mt-4`}>新しいユーザー名</Text>
             <TextInput
-              style={tw`bg-[#F7F9FB] rounded-[12px] px-4 py-3 mb-6 text-[16px] text-[#1C1C1E] border border-[#EAEAEA]`}
+              style={tw`bg-[#F7F9FB] rounded-[12px] px-4 py-3 mb-4 text-[16px] text-[#1C1C1E] border border-[#EAEAEA]`}
               placeholder="新しいユーザー名を入力"
               placeholderTextColor="#A0AEC0"
               value={newUsername}
@@ -410,9 +425,20 @@ export default function AccountScreen({ navigation }) {
               autoCapitalize="none"
             />
 
+            <Text style={tw`text-[14px] font-bold text-[#1C1C1E] mb-2 ml-1`}>新しいメールアドレス</Text>
+            <TextInput
+              style={tw`bg-[#F7F9FB] rounded-[12px] px-4 py-3 mb-6 text-[16px] text-[#1C1C1E] border border-[#EAEAEA]`}
+              placeholder="新しいメールアドレスを入力"
+              placeholderTextColor="#A0AEC0"
+              value={newEmail}
+              onChangeText={setNewEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
             <TouchableOpacity
               style={tw`bg-[#1E3D37] rounded-[16px] py-4 items-center mb-3 flex-row justify-center`}
-              onPress={handleUpdateUsername}
+              onPress={handleUpdateProfile}
               disabled={isUpdating}
             >
               {isUpdating ? (
