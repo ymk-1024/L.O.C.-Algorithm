@@ -47,6 +47,12 @@ describe('1. サーバー疎通確認', () => {
     expect(res.status).toBe(200);
     expect(res.text).toMatch(/API is running/i);
   });
+
+  test('1-2. GET /api/v1.0/version → 200 version info', async () => {
+    const res = await api.get('/api/v1.0/version');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('version');
+  });
 });
 
 // ======================================================
