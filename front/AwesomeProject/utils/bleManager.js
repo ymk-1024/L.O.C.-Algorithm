@@ -527,6 +527,16 @@ export const setVirtualMode = (enabled) => {
     return;
   }
   isVirtualMode = enabled;
+  
+  if (!isVirtualMode && !bleManager.manager && BleManagerClass) {
+    console.log('[BLE Manager] Instantiating native BleManagerClass...');
+    bleManager.manager = new BleManagerClass();
+  } else if (isVirtualMode && bleManager.manager) {
+    console.log('[BLE Manager] Destroying native BleManagerClass...');
+    bleManager.manager.destroy();
+    bleManager.manager = null;
+  }
+
   console.log(`[BLE Manager] Switched connection mode. Virtual Mode: ${isVirtualMode}`);
   bleManager.notifyStateChange();
 };
