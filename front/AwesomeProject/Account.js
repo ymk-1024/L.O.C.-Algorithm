@@ -50,10 +50,15 @@ export default function AccountScreen({ navigation }) {
               if (userRes.ok) {
                 const userData = await userRes.json();
                 if (userData.status === 200 && userData.data) {
+                  const dbEmail = userData.data.email;
+                  const displayEmail = (dbEmail && dbEmail.endsWith('@example.com')) 
+                    ? `ID: ${userData.data.username}` 
+                    : (dbEmail || 'Email未設定');
+
                   setUserInfo({
                     uuid: uuid,
                     username: userData.data.username || '名無し',
-                    email: userData.data.email || 'Email未設定',
+                    email: displayEmail,
                   });
                 }
               }
