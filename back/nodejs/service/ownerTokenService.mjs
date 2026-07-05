@@ -70,7 +70,13 @@ const ownerTokenService = {
 
       // すでに別のデバイスに紐づいているか確認
       if (stored.device_uuid && stored.device_uuid !== deviceUuid) {
-        return { status: 409, message: 'このOwnerTokenはすでに別のデバイスに使用されています。' };
+        try {
+          const deviceRepo = await import('../repository/deviceRepository.mjs');
+          await deviceRepo.default.deleteDevice(stored.device_uuid);
+          console.log(`Reused OwnerToken: Unlinked and deleted old device ${stored.device_uuid} to bind with new device ${deviceUuid}`);
+        } catch (err) {
+          console.warn(`Failed to clean up old device: ${err.message}`);
+        }
       }
 
       // device_uuid を紐づける
