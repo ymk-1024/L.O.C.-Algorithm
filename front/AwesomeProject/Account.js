@@ -30,17 +30,10 @@ export default function AccountScreen({ navigation }) {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    if (!settings.device.token) {
-      setLoginModalVisible(true);
-    }
-  }, [settings.device.token]);
-
-  useEffect(() => {
     const fetchUserInfo = async () => {
       let resolvedUrl = '';
       try {
         const apiUrl = getApiUrl();
-        // /auth/me を叩いてログイン状態を確認する
         resolvedUrl = `${apiUrl}/auth/me`;
         setDebugInfo(prev => ({ ...prev, url: resolvedUrl }));
 
@@ -50,7 +43,6 @@ export default function AccountScreen({ navigation }) {
           if (resData && resData.status === 200 && resData.data?.user_uuid) {
             setIsLoggedIn(true);
             const uuid = resData.data.user_uuid;
-            setUserInfo(prev => ({ ...prev, uuid: uuid }));
             
             // Fetch real user info
             try {
@@ -76,13 +68,17 @@ export default function AccountScreen({ navigation }) {
             setDebugInfo(prev => ({ ...prev, error: null }));
           } else {
             setIsLoggedIn(false);
+            setLoginModalVisible(true);
           }
         } else {
           setIsLoggedIn(false);
+          setLoginModalVisible(true);
         }
       } catch (error) {
         console.log('Account Auth Check Error:', error);
         setDebugInfo(prev => ({ ...prev, url: resolvedUrl, error: error.message }));
+        setIsLoggedIn(false);
+        setLoginModalVisible(true);
       }
     };
 
@@ -110,34 +106,19 @@ export default function AccountScreen({ navigation }) {
       });
 
       if (!loginRes.ok) {
-        const errData = await loginRes.json();
-        throw new Error(errData.message || 'ログインに失敗しました');
+        const textData = await loginRes.text();
+        let errMessage = 'ログインに失敗しました';
+        try {
+          const errData = JSON.parse(textData);
+          errMessage = errData.message || errMessage;
+        } catch (parseErr) {
+          errMessage = textData || errMessage;
+        }
+        throw new Error(errMessage);
       }
 
       const loginData = await loginRes.json();
-      const accessToken = loginData.data?.accessToken;
-
-      // 2. OwnerTokenを発行申請
-      const issueRes = await fetch(`${apiUrl}/device/issue-token`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': accessToken ? `Bearer ${accessToken}` : ''
-        },
-        body: JSON.stringify({ 
-          deviceUuid: settings.device.serialNumber || 'SN-UNKNOWN',
-          name: settings.device.name || 'SG-Sensor-X1'
-        })
-      });
-
-      const issueData = await issueRes.json();
-      if (!issueRes.ok || issueData.status !== 201) {
-        throw new Error(issueData.message || 'トークン発行に失敗しました');
-      }
-
-      // 3. トークンをContextに保存＆BLEでデバイスへ転送
-      const token = issueData.data.ownerToken;
-      updateSetting(['device', 'token'], token);
+      // トークン取得はログイン時ではなくデバイス登録時に行うように変更
 
       setIsLoggedIn(true);
       setUserInfo({
@@ -145,11 +126,8 @@ export default function AccountScreen({ navigation }) {
         email: 'ID: ' + identifier,
       });
       setLoginModalVisible(false);
-      Alert.alert(
-        '連携完了',
-        'サーバーからトークンを取得しました！',
-        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
-      );
+      // ログイン完了時はそのままHomeへ遷移
+      navigation.navigate('Home');
     } catch (error) {
       Alert.alert('エラー', error.message);
     } finally {
@@ -176,8 +154,15 @@ export default function AccountScreen({ navigation }) {
       });
 
       if (!registerRes.ok) {
-        const errData = await registerRes.json();
-        throw new Error(errData.message || '新規登録に失敗しました（既に存在する可能性があります）');
+        const textData = await registerRes.text();
+        let errMessage = '新規登録に失敗しました（既に存在する可能性があります）';
+        try {
+          const errData = JSON.parse(textData);
+          errMessage = errData.message || errMessage;
+        } catch (parseErr) {
+          errMessage = textData || errMessage;
+        }
+        throw new Error(errMessage);
       }
 
       // 登録成功したらそのままログイン処理へ流す
@@ -408,7 +393,7 @@ export default function AccountScreen({ navigation }) {
               <Text style={tw`text-[#1E3D37] font-bold text-[16px]`}>新規登録してトークン取得</Text>
             </TouchableOpacity>
 
-            {settings.device.token ? (
+            {isLoggedIn ? (
               <TouchableOpacity
                 style={tw`py-3 items-center`}
                 onPress={() => setLoginModalVisible(false)}
@@ -418,7 +403,7 @@ export default function AccountScreen({ navigation }) {
               </TouchableOpacity>
             ) : (
               <Text style={tw`text-center text-[12px] text-gray-500 mt-2`}>
-                アプリの利用にはログイン（トークン取得）が必須です
+                アプリの利用にはログインが必須です
               </Text>
             )}
           </View>
@@ -475,7 +460,7 @@ export default function AccountScreen({ navigation }) {
       </Modal>
 
       {/* 最下部の共通ボトムメニューバー */}
-      {settings.device.token ? <BottomMenuBar activeTab="Account" navigation={navigation} /> : null}
+      <BottomMenuBar activeTab="Account" navigation={navigation} />
     </SafeAreaView>
   );
 }

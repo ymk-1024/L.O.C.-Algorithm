@@ -71,6 +71,28 @@ export default function DeviceMgmtScreen({ navigation }) {
       Alert.alert('デバイス接続', `${device.name} に接続します...`);
       await bleManager.connectToDevice(device.id, device.rawDevice);
       Alert.alert('接続成功', `${device.name} とペアリングしました。`);
+
+      // デバイス登録時に毎回トークンを取得する（未保持の場合のみ？いや、毎回取得想定なので無条件で取得する）
+      const { getApiUrl } = require('../utils/api');
+      const apiUrl = getApiUrl();
+      const issueRes = await fetch(`${apiUrl}/device/issue-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: device.name || 'SG-Sensor-X1'
+        })
+      });
+      
+      if (issueRes.ok) {
+        const issueData = await issueRes.json();
+        if (issueData.status === 201) {
+          const token = issueData.data.ownerToken;
+          updateSetting(['device', 'token'], token);
+          console.log('[DeviceMgmtScreen] 新しいOwnerTokenを取得・保存しました:', token);
+        }
+      } else {
+        console.warn('[DeviceMgmtScreen] トークン取得に失敗しました', await issueRes.text());
+      }
     } catch (error) {
       Alert.alert('接続失敗', `ペアリングに失敗しました: ${error.message}`);
     }

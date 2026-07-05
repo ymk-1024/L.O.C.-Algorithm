@@ -1,13 +1,43 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, Switch, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, Switch, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { Ionicons } from '@expo/vector-icons';
 import AppHeader from './AppHeader';
 import BottomMenuBar from './BottomMenuBar';
+import { getApiUrl } from './utils/api';
 
 export default function HomeScreen({ navigation }) {
   const [isEnabled, setIsEnabled] = useState(true);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const toggleSwitch = () => setIsEnabled(previousState => !previousState);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const apiUrl = getApiUrl();
+        const response = await fetch(`${apiUrl}/auth/me`);
+        if (!response.ok) {
+          // 未ログインならAccountへ強制遷移
+          navigation.reset({ index: 0, routes: [{ name: 'Account' }] });
+        } else {
+          setIsCheckingAuth(false);
+        }
+      } catch (e) {
+        navigation.reset({ index: 0, routes: [{ name: 'Account' }] });
+      }
+    };
+    checkAuth();
+    const unsubscribe = navigation.addListener('focus', checkAuth);
+    return unsubscribe;
+  }, [navigation]);
+
+  if (isCheckingAuth) {
+    return (
+      <View style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#4ECDC4" />
+      </View>
+    );
+  }
 
   // 画像のグラデーションカラーに近い色を割り当てた棒データ
   const barData = [

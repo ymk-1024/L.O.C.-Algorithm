@@ -21,8 +21,9 @@ const Stack = createNativeStackNavigator();
 function MainNavigator() {
   const { settings } = useSettings();
   
-  // If no token exists, force them to start at Account screen to login
-  const initialRoute = settings.device.token ? "Home" : "Account";
+  // 以前はトークンの有無で初期画面を変えていたが、
+  // トークン＝デバイス連携になったため、常にHomeからスタートする
+  const initialRoute = "Home";
 
   return (
     <NavigationContainer>
