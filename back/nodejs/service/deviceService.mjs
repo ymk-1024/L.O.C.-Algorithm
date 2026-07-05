@@ -105,6 +105,11 @@ const deviceService = {
       if (!existing) {
         return { status: 404, message: 'Device not found' };
       }
+      
+      // OwnerToken のクリーンアップ
+      const ownerTokenRepo = await import('../repository/ownerTokenRepository.mjs');
+      await ownerTokenRepo.default.deleteOwnerTokenByDeviceUuid(uuid);
+
       await deviceRepository.deleteDevice(uuid);
       return { status: 200, message: 'Device deleted successfully' };
     } catch (error) {
