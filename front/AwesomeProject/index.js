@@ -14,26 +14,40 @@ import AccountScreen from './Account';
 import ScheduleScreen from './Schedule';
 import RecordsScreen from './Records';
 
+import { useSettings } from './setting/SettingsContext';
+
 const Stack = createNativeStackNavigator();
+
+function MainNavigator() {
+  const { settings } = useSettings();
+  
+  // If no token exists, force them to start at Account screen to login
+  const initialRoute = settings.device.token ? "Home" : "Account";
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName={initialRoute}
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+        }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Settings" component={Setting} />
+        <Stack.Screen name="Account" component={AccountScreen} />
+        <Stack.Screen name="Schedule" component={ScheduleScreen} />
+        <Stack.Screen name="Records" component={RecordsScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
 
 function App() {
   return (
     <SafeAreaProvider>
       <SettingsProvider>
-        <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            animation: 'fade',
-          }}
-        >
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Settings" component={Setting} />
-          <Stack.Screen name="Account" component={AccountScreen} />
-          <Stack.Screen name="Schedule" component={ScheduleScreen} />
-          <Stack.Screen name="Records" component={RecordsScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+        <MainNavigator />
       </SettingsProvider>
     </SafeAreaProvider>
   );

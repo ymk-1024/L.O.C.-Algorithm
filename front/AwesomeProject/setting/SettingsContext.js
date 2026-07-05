@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { bleManager } from '../utils/bleManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // -------------------------------------------------------------
 // Centralized Settings Data Structure (Easy to map with API)
@@ -22,7 +23,7 @@ const INITIAL_SETTINGS = {
     batteryLevel: 82,
     serialNumber: 'SN-98231B-G',
     firmwareVersion: 'v' + (process.env.EXPO_PUBLIC_APP_VERSION || '1.2.4'),
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXZpY2UtMTExMS0yMjIyLTMzMzMiLCJvd25lciI6Im1hdHR5IiwiaWF0IjoxNzE4NzczNjAwfQ.dummy_signature_jwt_token_placeholder_value',
+    token: '',
     registered: false,
   },
   notifications: {
@@ -39,6 +40,29 @@ const SettingsContext = createContext(null);
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@app_settings');
+        if (stored) {
+          setSettings(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error('Failed to load settings', e);
+      } finally {
+        setIsSettingsLoaded(true);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    if (isSettingsLoaded) {
+      AsyncStorage.setItem('@app_settings', JSON.stringify(settings)).catch(e => console.error('Failed to save settings', e));
+    }
+  }, [settings, isSettingsLoaded]);
 
   // Bluetooth BLE Operations
   const fetchSettingsFromDevice = async () => {

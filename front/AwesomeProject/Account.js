@@ -30,6 +30,12 @@ export default function AccountScreen({ navigation }) {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
+    if (!settings.device.token) {
+      setLoginModalVisible(true);
+    }
+  }, [settings.device.token]);
+
+  useEffect(() => {
     const fetchUserInfo = async () => {
       let resolvedUrl = '';
       try {
@@ -139,7 +145,11 @@ export default function AccountScreen({ navigation }) {
         email: 'ID: ' + identifier,
       });
       setLoginModalVisible(false);
-      Alert.alert('連携完了', 'サーバーからOwnerTokenを取得し、デバイスに書き込みました！');
+      Alert.alert(
+        '連携完了',
+        'サーバーからトークンを取得しました！',
+        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+      );
     } catch (error) {
       Alert.alert('エラー', error.message);
     } finally {
@@ -398,13 +408,19 @@ export default function AccountScreen({ navigation }) {
               <Text style={tw`text-[#1E3D37] font-bold text-[16px]`}>新規登録してトークン取得</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={tw`py-3 items-center`}
-              onPress={() => setLoginModalVisible(false)}
-              disabled={isLoggingIn}
-            >
-              <Text style={tw`text-[#7E8B93] font-bold text-[15px]`}>キャンセル</Text>
-            </TouchableOpacity>
+            {settings.device.token ? (
+              <TouchableOpacity
+                style={tw`py-3 items-center`}
+                onPress={() => setLoginModalVisible(false)}
+                disabled={isLoggingIn}
+              >
+                <Text style={tw`text-[#7E8B93] font-bold text-[15px]`}>キャンセル</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={tw`text-center text-[12px] text-gray-500 mt-2`}>
+                アプリの利用にはログイン（トークン取得）が必須です
+              </Text>
+            )}
           </View>
         </View>
       </Modal>
@@ -459,7 +475,7 @@ export default function AccountScreen({ navigation }) {
       </Modal>
 
       {/* 最下部の共通ボトムメニューバー */}
-      <BottomMenuBar activeTab="Account" navigation={navigation} />
+      {settings.device.token ? <BottomMenuBar activeTab="Account" navigation={navigation} /> : null}
     </SafeAreaView>
   );
 }
