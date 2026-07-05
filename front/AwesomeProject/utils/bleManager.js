@@ -1,8 +1,8 @@
 import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
-
+import WifiManager from 'react-native-wifi-reborn';
 // Dynamic loading of react-native-ble-plx to prevent crashes in Expo Go or Web environments
 let BleManagerClass = null;
-let isVirtualMode = false;
+let isVirtualMode = true; // Forced for testing without device
 
 if (Platform.OS !== 'web') {
   try {
@@ -64,7 +64,7 @@ class LOCBleManager {
     this.virtualDevice = {
       id: 'device-uuid-0001-aaaa-bbbb',
       name: 'SG-Sensor-X1',
-      status: 'Disconnected',
+      status: 'Connected', // Start connected to allow UI testing
       batteryLevel: 82,
       serialNumber: 'SN-98231B-G',
       firmwareVersion: 'v1.0.0',
@@ -422,7 +422,6 @@ class LOCBleManager {
     }
   }
 
-  // Scan for Wi-Fi networks via connected device (simulated or real)
   async scanWifi() {
     const baseNetworks = [
       { ssid: 'StandUpGuardian_2.4G', secure: true, signal: 4 },
@@ -432,71 +431,58 @@ class LOCBleManager {
       { ssid: 'Free-Public-WiFi', secure: false, signal: 3 },
     ];
 
-    // Merge in user-added real SSIDs
     const merged = [...baseNetworks];
     knownSsids.forEach((ssid) => {
       if (!merged.some((n) => n.ssid === ssid)) {
         merged.push({ ssid: ssid, secure: true, signal: Math.floor(Math.random() * 3) + 2 });
       }
     });
-
-    // Shuffle for scan realism
     const shuffled = merged.sort(() => Math.random() - 0.5);
 
-    if (isVirtualMode) {
-      console.log('[BLE Wi-Fi] Requesting simulated Wi-Fi scan from device...');
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          console.log('[BLE Wi-Fi] Simulated Wi-Fi scan completed. Found networks.');
-          resolve(shuffled);
-        }, 1500);
-      });
-    } else {
-      if (!this.connectedDevice) {
-        throw new Error('No device connected via BLE to perform Wi-Fi scan.');
-      }
-      
-      console.log('[BLE Wi-Fi] Requesting REAL Wi-Fi scan from Android native chip...');
-      try {
-        const WifiModule = NativeModules.WifiModule;
-        if (WifiModule && WifiModule.scanWifiNetworks) {
-          const realResults = await WifiModule.scanWifiNetworks();
-          console.log(`[BLE Wi-Fi] Native Wi-Fi scan success. Found ${realResults.length} real SSIDs.`);
-          if (realResults.length > 0) {
-            return realResults;
-          }
+    try {
+      if (Platform.OS === 'android') {
+        const wifiList = await WifiManager.reScanAndLoadWifiList();
+        console.log(`[BLE Wi-Fi] Native Wi-Fi scan success. Found ${wifiList.length} real SSIDs.`);
+        if (wifiList && wifiList.length > 0) {
+          // Filter out hidden/empty SSIDs and remove duplicates
+          const uniqueNetworks = [];
+          const seenSsids = new Set();
+          wifiList.forEach(net => {
+            const ssid = net.SSID;
+            if (ssid && ssid.trim() !== '' && !seenSsids.has(ssid)) {
+              seenSsids.add(ssid);
+              uniqueNetworks.push({
+                ssid: ssid,
+                secure: net.capabilities && !net.capabilities.includes('NONE'),
+                signal: 3
+              });
+            }
+          });
+          return uniqueNetworks;
         }
-      } catch (nativeError) {
-        console.warn('[BLE Wi-Fi] Native Wi-Fi scan failed or not supported:', nativeError.message);
       }
-      
-      // Fallback if native module fails or returns empty
-      console.log('[BLE Wi-Fi] Falling back to dynamic mixed mock list.');
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(shuffled);
-        }, 1200);
-      });
+    } catch (nativeError) {
+      console.warn('[BLE Wi-Fi] Native Wi-Fi scan failed or not supported:', nativeError.message);
     }
+
+    console.log('[BLE Wi-Fi] Falling back to dynamic mixed mock list.');
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(shuffled), 1200);
+    });
   }
 
   // Get currently connected Wi-Fi SSID from native or mock fallback
   async getCurrentWifiSsid() {
-    if (isVirtualMode) {
-      return 'StandUpGuardian_2.4G';
-    } else {
-      try {
-        const WifiModule = NativeModules.WifiModule;
-        if (WifiModule && WifiModule.getCurrentWifiSsid) {
-          const ssid = await WifiModule.getCurrentWifiSsid();
-          console.log('[BLE Wi-Fi] Retrieved current connected SSID from Native:', ssid);
-          return ssid;
-        }
-      } catch (error) {
-        console.warn('[BLE Wi-Fi] Failed to retrieve current SSID via native:', error);
+    try {
+      if (Platform.OS === 'android') {
+        const ssid = await WifiManager.getCurrentWifiSSID();
+        console.log('[BLE Wi-Fi] Retrieved current connected SSID from Native:', ssid);
+        if (ssid) return ssid;
       }
-      return 'StandUpGuardian_2.4G'; // Default fallback
+    } catch (error) {
+      console.warn('[BLE Wi-Fi] Failed to retrieve current SSID via native:', error);
     }
+    return 'StandUpGuardian_2.4G'; // Default fallback
   }
 
   saveWifiCredentials(ssid, password) {

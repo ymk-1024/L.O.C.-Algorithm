@@ -10,28 +10,7 @@ export const getApiUrl = () => {
   
   // If no custom env URL is set or it is pointing to the production mockup domain
   if (!envUrl || envUrl.includes('api.standupguardian.com')) {
-    let host = 'localhost';
-    
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.location) {
-        host = window.location.hostname;
-      }
-    } else {
-      const scriptURL = NativeModules.SourceCode?.scriptURL;
-      if (scriptURL) {
-        const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
-        if (match) {
-          host = match[1];
-        }
-      }
-    }
-    
-    // Android fallback: use 127.0.0.1 so adb reverse works on physical devices (Bridgeless mode)
-    if (host === 'localhost' && Platform.OS === 'android') {
-      host = '127.0.0.1';
-    }
-    
-    return `http://${host}:3005/api/v1.0`;
+    return 'https://loc.mattya3340.com/api/v1.0';
   }
   
   if (envUrl.endsWith('/v1.0')) {

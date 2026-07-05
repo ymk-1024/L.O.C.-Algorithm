@@ -244,7 +244,7 @@ export default function WifiSettingScreen({ navigation }) {
                       <Ionicons name="checkmark-circle" size={24} color="#27AE60" />
                       <View style={{ marginLeft: 10 }}>
                         <Text style={tw`text-[18px] font-bold text-[#1C1C1E]`}>{settings.wifi.connectedSsid}</Text>
-                        <Text style={tw`text-[12px] text-[#27AE60] font-medium`}>接続済み (5GHz)</Text>
+                        <Text style={tw`text-[12px] text-[#27AE60] font-medium`}>接続済み (2.4GHz)</Text>
                       </View>
                     </>
                   ) : (
@@ -292,28 +292,35 @@ export default function WifiSettingScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
               ) : (
-                networks.map((net, index) => {
-                  const isLast = index === networks.length - 1;
-                  return (
-                    <TouchableOpacity
-                      key={net.ssid}
-                      style={tw`flex-row items-center justify-between py-[18px] ${!isLast ? 'border-b border-[#EAEAEA]' : ''}`}
-                      onPress={() => handleConnect(net.ssid, net.secure)}
-                    >
-                      <View style={tw`flex-row items-center`}>
-                        <Ionicons
-                          name={net.secure ? 'lock-closed-outline' : 'globe-outline'}
-                          size={18}
-                          color="#8E8E93"
-                        />
-                        <Text style={tw`text-[18px] text-[#1C1C1E] ml-[10px]`}>{net.ssid}</Text>
-                      </View>
-                      <View style={tw`justify-center`}>
-                        <Ionicons name="wifi" size={18} color="#8E8E93" />
-                      </View>
+                <>
+                  {networks.map((net, index) => {
+                    const isLast = index === networks.length - 1;
+                    return (
+                      <TouchableOpacity
+                        key={net.ssid}
+                        style={tw`flex-row items-center justify-between py-[18px] ${!isLast ? 'border-b border-[#EAEAEA]' : ''}`}
+                        onPress={() => handleConnect(net.ssid, net.secure)}
+                      >
+                        <View style={tw`flex-row items-center`}>
+                          <Ionicons
+                            name={net.secure ? 'lock-closed-outline' : 'globe-outline'}
+                            size={18}
+                            color="#8E8E93"
+                          />
+                          <Text style={tw`text-[18px] text-[#1C1C1E] ml-[10px]`}>{net.ssid}</Text>
+                        </View>
+                        <View style={tw`justify-center`}>
+                          <Ionicons name="wifi" size={18} color="#8E8E93" />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {!isScanning && (
+                    <TouchableOpacity style={tw`mt-4 bg-[#EAF6F3] py-3 rounded-[12px] items-center`} onPress={triggerWifiScan}>
+                      <Text style={tw`text-[#1E3D37] font-bold text-[14px]`}>さらにネットワークを検索...</Text>
                     </TouchableOpacity>
-                  );
-                })
+                  )}
+                </>
               )}
 
               {isConnectedDevice && !isScanning && (
