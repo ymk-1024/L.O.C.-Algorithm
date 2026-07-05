@@ -161,7 +161,7 @@ inline bool registerDevice() {
     
     StaticJsonDocument<256> doc;
     doc["uuid"] = myDeviceUUID;
-    doc["model"] = "cushion";
+    doc["model"] = "LOC-v1";
     
     String payload;
     serializeJson(doc, payload);
@@ -276,6 +276,28 @@ inline bool sendExecutionAck(const String& commandId) {
     String path = "/api/v1.0/device/command/" + commandId + "/ack";
     String response = "";
     return sendApiRequest(path, "GET", "", response);
+}
+
+// 自己ステータスの送信
+inline bool sendStatusReport(int seatState) {
+    if (WiFi.status() != WL_CONNECTED || !isRegistered) {
+        return false;
+    }
+
+    Serial.println("Sending device status report to server...");
+
+    StaticJsonDocument<256> doc;
+    doc["battery_level"] = 100; // ダミー値（将来的にアナログ値などを読む想定）
+    doc["is_sitting"] = (seatState == 1);
+    
+    JsonObject otherStatus = doc.createNestedObject("other_status");
+    otherStatus["firmware_version"] = "v1.0.0";
+
+    String payload;
+    serializeJson(doc, payload);
+    String response = "";
+
+    return sendApiRequest("/api/v1.0/device/status", "POST", payload, response);
 }
 
 #endif // APIS_H

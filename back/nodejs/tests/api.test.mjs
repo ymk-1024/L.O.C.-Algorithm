@@ -1,4 +1,4 @@
-﻿/**
+/**
  * L.O.C. API - 統合テスト（E2E）
  * api-test.http の全リクエストを自動実行します。
  *
@@ -121,6 +121,9 @@ describe('4. デバイス登録・認証 (OwnerToken Flow)', () => {
       .post('/api/v1.0/device/self-register')
       .set('Content-Type', 'application/json')
       .set('Authorization', `OwnerToken ${ownerToken}`)
+      .set('X-Timestamp', Math.floor(Date.now() / 1000).toString())
+      .set('X-Nonce', 'jestnonce123')
+      .set('X-Device-UUID', deviceUuid)
       .send({ uuid: deviceUuid, model: 'LOC-jest-test' });
     expect(res.status).toBe(201);
     console.log('  デバイス登録完了:', deviceUuid);
@@ -129,7 +132,10 @@ describe('4. デバイス登録・認証 (OwnerToken Flow)', () => {
   test('4-3. POST /device/token/refresh → 200 OwnerToken 更新', async () => {
     const res = await api
       .post('/api/v1.0/device/token/refresh')
-      .set('Authorization', `OwnerToken ${ownerToken}`);
+      .set('Authorization', `OwnerToken ${ownerToken}`)
+      .set('X-Timestamp', Math.floor(Date.now() / 1000).toString())
+      .set('X-Nonce', 'jestnonce123')
+      .set('X-Device-UUID', deviceUuid);
     expect(res.status).toBe(200);
     // newOwnerToken キーで返ってくる
     if (res.body.data?.newOwnerToken) {
@@ -146,14 +152,20 @@ describe('5. デバイス機能', () => {
   test('5-1. GET /device/ping → 200 生存確認', async () => {
     const res = await api
       .get('/api/v1.0/device/ping')
-      .set('Authorization', `OwnerToken ${ownerToken}`);
+      .set('Authorization', `OwnerToken ${ownerToken}`)
+      .set('X-Timestamp', Math.floor(Date.now() / 1000).toString())
+      .set('X-Nonce', 'jestnonce123')
+      .set('X-Device-UUID', deviceUuid);
     expect(res.status).toBe(200);
   });
 
   test('5-2. GET /device/polling → 200 ポーリング', async () => {
     const res = await api
       .get('/api/v1.0/device/polling?is_sitting=true')
-      .set('Authorization', `OwnerToken ${ownerToken}`);
+      .set('Authorization', `OwnerToken ${ownerToken}`)
+      .set('X-Timestamp', Math.floor(Date.now() / 1000).toString())
+      .set('X-Nonce', 'jestnonce123')
+      .set('X-Device-UUID', deviceUuid);
     expect(res.status).toBe(200);
   });
 
@@ -162,6 +174,9 @@ describe('5. デバイス機能', () => {
       .post('/api/v1.0/device/status')
       .set('Content-Type', 'application/json')
       .set('Authorization', `OwnerToken ${ownerToken}`)
+      .set('X-Timestamp', Math.floor(Date.now() / 1000).toString())
+      .set('X-Nonce', 'jestnonce123')
+      .set('X-Device-UUID', deviceUuid)
       .send({ battery_level: 85, is_sitting: true, other_status: { firmware_version: 'jest-v1' } });
     expect(res.status).toBe(200);
   });
@@ -169,7 +184,10 @@ describe('5. デバイス機能', () => {
   test('5-4. GET /device/settings → 200 デバイス設定取得', async () => {
     const res = await api
       .get('/api/v1.0/device/settings')
-      .set('Authorization', `OwnerToken ${ownerToken}`);
+      .set('Authorization', `OwnerToken ${ownerToken}`)
+      .set('X-Timestamp', Math.floor(Date.now() / 1000).toString())
+      .set('X-Nonce', 'jestnonce123')
+      .set('X-Device-UUID', deviceUuid);
     expect(res.status).toBe(200);
   });
 });

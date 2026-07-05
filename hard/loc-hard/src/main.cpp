@@ -674,11 +674,14 @@ void loop() {
             registerDevice();
         }
         
-        // 着座状態の変化を監視しログ出力
+        // 着座状態の変化を監視しログ出力 & サーバーに送信
         static int lastSeatState = -1;
         int currentSeatState = sensor.readValue();
         if (currentSeatState != lastSeatState) {
             Serial.printf("[State Change] Seat State changed from %d to %d\n", lastSeatState, currentSeatState);
+            if (isRegistered && WiFi.status() == WL_CONNECTED) {
+                sendStatusReport(currentSeatState);
+            }
             lastSeatState = currentSeatState;
         }
         

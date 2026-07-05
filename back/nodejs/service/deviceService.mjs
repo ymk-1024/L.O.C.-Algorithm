@@ -1,6 +1,39 @@
 import deviceRepository from '../repository/deviceRepository.mjs';
 import ownerTokenService from './ownerTokenService.mjs';
+import sitDataRepository from '../repository/sitDataRepository.mjs';
 import { v7 as uuidV7 } from 'uuid';
+
+const handleSittingStateChange = async (deviceUuid, isSitting) => {
+  try {
+    const latest = await sitDataRepository.getLatestSitDataByDevice(deviceUuid);
+    
+    if (isSitting) {
+      if (latest && latest.end_at === null) {
+        return;
+      }
+      
+      if (latest && latest.end_at !== null) {
+        const diffMs = Date.now() - new Date(latest.end_at).getTime();
+        if (diffMs < 2 * 60 * 1000) { // 2 minutes
+          await sitDataRepository.updateSitData(latest.uuid, deviceUuid, null);
+          return;
+        }
+      }
+      
+      const newUuid = uuidV7();
+      await sitDataRepository.createSitData(newUuid, deviceUuid, null);
+      
+    } else {
+      if (latest && latest.end_at === null) {
+        const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await sitDataRepository.updateSitData(latest.uuid, deviceUuid, nowStr);
+      }
+    }
+  } catch (error) {
+    console.error(`[SittingStateChange Error] deviceUuid=${deviceUuid}:`, error);
+  }
+};
+
 
 const deviceService = {
   getAllDevices: async () => {
@@ -129,6 +162,9 @@ const deviceService = {
       const repo = await import('../repository/deviceCommandRepository.mjs');
       await repo.default.updateLastPing(deviceUuid);
 
+      // 着座状態の管理
+      await handleSittingStateChange(deviceUuid, isSitting);
+
       // コマンドの取得
       const pendingCommands = await repo.default.getPendingCommands(deviceUuid);
 
@@ -185,6 +221,10 @@ const deviceService = {
     try {
       const repo = await import('../repository/deviceCommandRepository.mjs');
       await repo.default.insertDeviceStatusLog(deviceUuid, batteryLevel, isSitting, otherStatus);
+
+      // 着座状態の管理
+      await handleSittingStateChange(deviceUuid, isSitting);
+
       return { status: 200, message: 'ステータスを更新しました。' };
     } catch (error) {
       throw new Error(`DB Error: ${error.message}`);
