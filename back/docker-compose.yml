@@ -8,12 +8,14 @@ services:
     working_dir: /usr/src/app
     volumes:
       - ./nodejs:/usr/src/app
+      - ./tables:/usr/src/tables
     ports:
       - "${NODE_PORT}:${NODE_PORT}"
     env_file:
       - .env
     environment:
       MYSQL_PORT: 3306
+      MYSQL_HOST: loc-mysql
     depends_on:
       - mysql
     tty: true

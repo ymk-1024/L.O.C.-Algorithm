@@ -16,8 +16,9 @@ dotenv.config();
 const app = express();
 const port = process.env.NODE_PORT || 3000;
 
-// [NEW] MySQL コネクションプール初期化
+// [NEW] MySQL コネクションプール初期化 & マイグレーション実行
 await db.initializePool();
+await db.runMigrations();
 
 // [NEW] ミドルウェアチェーン
 app.use(requestLogger);       // リクエストログ
