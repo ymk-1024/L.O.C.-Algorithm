@@ -84,6 +84,39 @@ export default function DetailsScreen({ navigation }) {
             })}
           </View>
         </View>
+
+        {/* Debug Mode */}
+        <Text style={tw`text-[16px] font-bold text-[#7E8B93] mb-2 ml-2`}>🛠 デバッグ</Text>
+        <View style={tw`bg-white rounded-[20px] p-5 mb-4 shadow-sm border border-amber-200`}>
+          <TouchableOpacity
+            style={tw`flex-row items-center justify-between py-1`}
+            onPress={() => {
+              const next = !settings.debugMode;
+              updateSetting(['debugMode'], next);
+              // デバッグON→リマインダー1分、OFF→60分に戻す
+              updateSetting(['reminderIntervalMinutes'], next ? 1 : 60);
+            }}
+            activeOpacity={0.7}
+          >
+            <View>
+              <Text style={tw`text-[17px] font-semibold text-[#1C1C1E]`}>デバッグモード</Text>
+              <Text style={tw`text-[12px] text-amber-600 mt-1`}>
+                {settings.debugMode
+                  ? '⚠️ ON: リマインダー 1分間隔'
+                  : 'OFF: 本番設定で動作中'}
+              </Text>
+            </View>
+            <View style={[
+              tw`w-[51px] h-[31px] rounded-full justify-center`,
+              { backgroundColor: settings.debugMode ? '#F59E0B' : '#D1D1D6' }
+            ]}>
+              <View style={[
+                tw`w-[27px] h-[27px] rounded-full bg-white shadow-sm`,
+                { marginLeft: settings.debugMode ? 22 : 2 }
+              ]} />
+            </View>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

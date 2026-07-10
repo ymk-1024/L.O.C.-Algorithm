@@ -7,7 +7,7 @@ import DetailHeader from './DetailHeader';
 import { bleManager, setVirtualMode, getIsVirtualMode } from '../utils/bleManager';
 
 export default function DeviceMgmtScreen({ navigation }) {
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
 
   const [isScanning, setIsScanning] = useState(false);
   const [discoveredDevices, setDiscoveredDevices] = useState([]);

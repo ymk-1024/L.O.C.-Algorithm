@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { bleManager } from '../utils/bleManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchUserSettings, saveUserSettings, getApiUrl } from '../utils/api';
 
 // -------------------------------------------------------------
 // Centralized Settings Data Structure (Easy to map with API)
@@ -17,6 +18,7 @@ const INITIAL_SETTINGS = {
   reminderIntervalMinutes: 60,
   dailyStandGoal: 8,
   sensorSensitivity: 'Medium', // 'Low' | 'Medium' | 'High'
+  debugMode: false,
   device: {
     name: process.env.EXPO_PUBLIC_DEFAULT_DEVICE_NAME || 'SG-Sensor-X1',
     status: 'Disconnected',
@@ -41,6 +43,24 @@ const SettingsContext = createContext(null);
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  const [userUuid, setUserUuid] = useState(null);
+  const saveTimerRef = useRef(null);
+
+  // ログイン状態の確認とuserUuid取得
+  useEffect(() => {
+    const resolveUser = async () => {
+      try {
+        const res = await fetch(`${getApiUrl()}/auth/me`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.data?.user_uuid) setUserUuid(data.data.user_uuid);
+        }
+      } catch (e) {
+        // 未ログイン or ネットワーク不可 - 無視してローカル設定のみ使用
+      }
+    };
+    resolveUser();
+  }, []);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -58,11 +78,40 @@ export function SettingsProvider({ children }) {
     loadSettings();
   }, []);
 
+  // AsyncStorage への永続化
   useEffect(() => {
     if (isSettingsLoaded) {
       AsyncStorage.setItem('@app_settings', JSON.stringify(settings)).catch(e => console.error('Failed to save settings', e));
     }
   }, [settings, isSettingsLoaded]);
+
+  // ログイン済みユーザーのサーバー設定をロード（AsyncStorage より優先）
+  useEffect(() => {
+    if (!userUuid || !isSettingsLoaded) return;
+    fetchUserSettings(userUuid).then((serverSettings) => {
+      if (!serverSettings) return;
+      setSettings((prev) => ({
+        ...prev,
+        reminderIntervalMinutes: serverSettings.reminderIntervalMinutes ?? prev.reminderIntervalMinutes,
+        dailyStandGoal:          serverSettings.dailyStandGoal          ?? prev.dailyStandGoal,
+        sensorSensitivity:       serverSettings.sensorSensitivity       ?? prev.sensorSensitivity,
+      }));
+      console.log('[API] User settings loaded from server:', serverSettings);
+    });
+  }, [userUuid, isSettingsLoaded]);
+
+  // サーバーへの保存（1秒デバウンス）
+  const syncToServer = (newSettings) => {
+    if (!userUuid) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveUserSettings(userUuid, {
+        reminderIntervalMinutes: newSettings.reminderIntervalMinutes,
+        dailyStandGoal:          newSettings.dailyStandGoal,
+        sensorSensitivity:       newSettings.sensorSensitivity,
+      });
+    }, 1000);
+  };
 
   // Bluetooth BLE Operations
   const fetchSettingsFromDevice = async () => {
@@ -88,17 +137,17 @@ export function SettingsProvider({ children }) {
 
   const updateSetting = (path, value) => {
     setSettings((prev) => {
-      const newSettings = JSON.parse(JSON.stringify(prev)); // Deep copy helper
-      
-      // Traverse to nested field
+      const newSettings = JSON.parse(JSON.stringify(prev));
       let current = newSettings;
       for (let i = 0; i < path.length - 1; i++) {
         current = current[path[i]];
       }
       current[path[path.length - 1]] = value;
 
-      // Sync updated configuration to BLE hardware
+      // BLE ハードウェアへ同期
       syncSettingsToDevice(newSettings);
+      // サーバーへ保存（デバウンス）
+      syncToServer(newSettings);
 
       return newSettings;
     });
