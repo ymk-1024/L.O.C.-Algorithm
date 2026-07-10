@@ -26,7 +26,7 @@
 #define MOTOR_PWM10    27
 #define EXPAND_PIN1    32
 #define EXPAND_PIN2    33
-#define SENSOR_IN      34
+#define SENSOR_IN      15
 #define CONFIG_RESET   13
 
 const int freq = 5000;
@@ -107,10 +107,10 @@ private:
 public:
     SensorController(int pin) : sensorPin(pin) {}
     void begin() {
-        pinMode(sensorPin, INPUT);
+        pinMode(sensorPin, INPUT_PULLUP);
     }
     int readValue() {
-        return digitalRead(sensorPin);
+        return !digitalRead(sensorPin);
     }
 };
 
