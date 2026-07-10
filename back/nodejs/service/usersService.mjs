@@ -129,4 +129,60 @@ usersService.deleteUser = async (uuid) => {
     }
 };
 
+// ユーザー設定取得
+usersService.getUserSettings = async (uuid) => {
+    try {
+        const row = await usersRepository.getUserSettings(uuid);
+        if (!row) return { status: 404, message: 'User not found' };
+        return {
+            status: 200,
+            data: {
+                reminderIntervalMinutes: row.reminder_interval_minutes,
+                dailyStandGoal: row.daily_stand_goal,
+                sensorSensitivity: row.sensor_sensitivity,
+            }
+        };
+    } catch (error) {
+        throw new Error(`DB Error: ${error.message}`);
+    }
+};
+
+// ユーザー設定更新
+usersService.updateUserSettings = async (uuid, reminderIntervalMinutes, dailyStandGoal, sensorSensitivity) => {
+    try {
+        const existingUser = await usersRepository.getUserById(uuid);
+        if (!existingUser) return { status: 404, message: 'User not found' };
+
+        const validSensitivities = ['Low', 'Medium', 'High'];
+        if (sensorSensitivity && !validSensitivities.includes(sensorSensitivity)) {
+            return { status: 400, message: 'Invalid sensorSensitivity value' };
+        }
+
+        const updated = await usersRepository.updateUserSettings(
+            uuid,
+            reminderIntervalMinutes ?? 60,
+            dailyStandGoal ?? 8,
+            sensorSensitivity ?? 'Medium'
+        );
+
+        // デバイスの取得
+        const devRepo = await import('../repository/deviceRepository.mjs');
+        const cmdRepo = await import('../repository/deviceCommandRepository.mjs');
+        const devices = await devRepo.default.getDevicesByUserUuid(uuid);
+
+        // デバイスへコマンド追加
+        for (const device of devices) {
+            await cmdRepo.default.insertCommand(device.uuid, 'SettingsUpdated', {
+                reminder_interval_minutes: reminderIntervalMinutes ?? 60,
+                daily_stand_goal: dailyStandGoal ?? 8,
+                sensor_sensitivity: sensorSensitivity ?? 'Medium'
+            });
+        }
+
+        return { status: 200, message: 'Settings updated', data: updated };
+    } catch (error) {
+        throw new Error(`DB Error: ${error.message}`);
+    }
+};
+
 export default usersService;

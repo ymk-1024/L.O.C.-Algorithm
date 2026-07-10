@@ -60,4 +60,22 @@ export const deleteUser = async (uuid) => {
   await query('DELETE FROM users WHERE uuid = ?', [uuid]);
 };
 
-export default { getAllUsers, getUserById, getUserWithPasswordById, findUserByEmailOrUsername, createUser, updateUser, deleteUser };
+// ユーザー設定取得
+export const getUserSettings = async (uuid) => {
+  const results = await query(
+    'SELECT reminder_interval_minutes, daily_stand_goal, sensor_sensitivity FROM users WHERE uuid = ?',
+    [uuid]
+  );
+  return results.length > 0 ? results[0] : null;
+};
+
+// ユーザー設定更新
+export const updateUserSettings = async (uuid, reminderIntervalMinutes, dailyStandGoal, sensorSensitivity) => {
+  await query(
+    'UPDATE users SET reminder_interval_minutes = ?, daily_stand_goal = ?, sensor_sensitivity = ?, update_at = CURRENT_TIMESTAMP WHERE uuid = ?',
+    [reminderIntervalMinutes, dailyStandGoal, sensorSensitivity, uuid]
+  );
+  return { uuid, reminderIntervalMinutes, dailyStandGoal, sensorSensitivity };
+};
+
+export default { getAllUsers, getUserById, getUserWithPasswordById, findUserByEmailOrUsername, createUser, updateUser, deleteUser, getUserSettings, updateUserSettings };

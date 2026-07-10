@@ -165,10 +165,37 @@ const deviceService = {
   polling: async (deviceUuid, userUuid, isSitting) => {
     try {
       const repo = await import('../repository/deviceCommandRepository.mjs');
+      const userRepo = await import('../repository/usersRepository.mjs');
+      
       await repo.default.updateLastPing(deviceUuid);
-
       // 着座状態の管理
       await handleSittingStateChange(deviceUuid, isSitting);
+      // ユーザー設定の取得
+      const settings = await userRepo.default.getUserSettings(userUuid) || {
+        reminder_interval_minutes: 60,
+        daily_stand_goal: 8,
+        sensor_sensitivity: 'Medium'
+      };
+
+      // 着座時間がリマインダー間隔を超えているかチェックし、必要ならコマンドを発行
+      if (isSitting) {
+        const sitDataRepo = await import('../repository/sitDataRepository.mjs');
+        const currentSit = await sitDataRepo.default.getLatestSitDataByDevice(deviceUuid);
+        if (currentSit && currentSit.end_at === null) {
+          const sitDurationMinutes = (Date.now() - new Date(currentSit.start_at).getTime()) / 60000;
+          if (sitDurationMinutes >= settings.reminder_interval_minutes) {
+            // 最後に vibrate コマンドを出したのが、指定間隔以内かチェック
+            const lastReminder = await repo.default.getLatestCommandByType(deviceUuid, 'vibrate');
+            const timeSinceLastReminder = lastReminder 
+              ? (Date.now() - new Date(lastReminder.create_at).getTime()) / 60000 
+              : Infinity;
+            
+            if (timeSinceLastReminder >= settings.reminder_interval_minutes) {
+              await repo.default.insertCommand(deviceUuid, 'vibrate', { intensity: 'high' });
+            }
+          }
+        }
+      }
 
       // コマンドの取得
       const pendingCommands = await repo.default.getPendingCommands(deviceUuid);
@@ -199,6 +226,7 @@ const deviceService = {
         status: 200,
         data: {
           interval_ms,
+          settings,
           pending_commands: pendingCommands,
         }
       };

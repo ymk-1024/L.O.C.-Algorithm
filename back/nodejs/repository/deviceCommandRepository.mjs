@@ -57,6 +57,24 @@ export const getActiveSchedulesByDay = async (userUuid, dayOfWeek) => {
   );
 };
 
+// デバイスへのコマンド追加
+export const insertCommand = async (deviceUuid, commandType, payload) => {
+  const payloadStr = typeof payload === 'object' ? JSON.stringify(payload) : payload;
+  await query(
+    'INSERT INTO device_commands (device_uuid, command_type, payload, status) VALUES (?, ?, ?, "pending")',
+    [deviceUuid, commandType, payloadStr]
+  );
+};
+
+// 特定の種類の最新コマンドを取得
+export const getLatestCommandByType = async (deviceUuid, commandType) => {
+  const results = await query(
+    'SELECT id, device_uuid, command_type, payload, status, create_at, update_at FROM device_commands WHERE device_uuid = ? AND command_type = ? ORDER BY create_at DESC LIMIT 1',
+    [deviceUuid, commandType]
+  );
+  return results.length > 0 ? results[0] : null;
+};
+
 export default {
   getPendingCommands,
   getCommandById,
@@ -64,4 +82,6 @@ export default {
   updateLastPing,
   insertDeviceStatusLog,
   getActiveSchedulesByDay,
+  insertCommand,
+  getLatestCommandByType,
 };

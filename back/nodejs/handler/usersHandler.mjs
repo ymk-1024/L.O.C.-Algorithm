@@ -77,11 +77,36 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
+const getUserSettings = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const result = await usersService.getUserSettings(uuid);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateUserSettings = async (req, res, next) => {
+  try {
+    const uuid = sanitize(req.params.uuid);
+    const reminderIntervalMinutes = Number(req.body.reminderIntervalMinutes);
+    const dailyStandGoal         = Number(req.body.dailyStandGoal);
+    const sensorSensitivity      = sanitize(req.body.sensorSensitivity);
+    const result = await usersService.updateUserSettings(uuid, reminderIntervalMinutes, dailyStandGoal, sensorSensitivity);
+    res.status(result.status).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   test,
   getAllUsers,
   getUserById,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  getUserSettings,
+  updateUserSettings,
 };
