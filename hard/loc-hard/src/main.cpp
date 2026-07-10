@@ -110,7 +110,7 @@ public:
         pinMode(sensorPin, INPUT_PULLUP);
     }
     int readValue() {
-        return !digitalRead(sensorPin);
+        return digitalRead(sensorPin);
     }
 };
 
@@ -561,20 +561,21 @@ void setup() {
     Serial.println("Device UUID: " + myDeviceUUID);
     Serial.println("Owner UUID: " + myOwnerToken);
 
-    // BLE設定モードは常にバックグラウンドで起動
-    startBleConfig();
-
     delay(100);
+
+    bool bleStarted = false;
 
     if (configResetSw.isPressed()) {
         clearWifiAndConfig();
         Serial.println("WiFi Config & Device Config Cleared");
         delay(500);
 
-        // 長押し: BLEモード (常に解放されているためそのまま進む)
+        // 長押し: BLEモード
         delay(2000);
         if (configResetSw.isPressed()) {
-            Serial.println("Entering BLE Config Mode (Always active, proceeding to loop)");
+            Serial.println("Entering BLE Config Mode (proceeding to loop)");
+            startBleConfig();
+            bleStarted = true;
         } else {
             // Webサーバーモード
             Serial.println("Entering Web Config Mode");
@@ -586,11 +587,19 @@ void setup() {
     String ssid = loadSSID();
     if (ssid.isEmpty()) {
         Serial.println("No Wi-Fi credentials. Waiting for BLE configuration...");
+        if (!bleStarted) {
+            startBleConfig();
+            bleStarted = true;
+        }
     } else {
         // 設定がある場合はWi-Fi接続を試みる
         Serial.println("Wi-Fi credentials found. Connecting...");
         if (!connectWiFi()) {
             Serial.println("Initial Wi-Fi connection failed. Proceeding to normal mode to retry in background.");
+            if (!bleStarted) {
+                startBleConfig();
+                bleStarted = true;
+            }
         } else {
             // 時刻同期
             initNTP();

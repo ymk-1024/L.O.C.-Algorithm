@@ -117,6 +117,7 @@ inline bool sendApiRequest(const String& path, const String& method, const Strin
 
     Serial.println("----------------------------------------");
     Serial.printf("[API Request] %s %s\n", method.c_str(), url.c_str());
+    Serial.printf("  Free Heap: %u bytes, Min Free Heap: %u bytes\n", ESP.getFreeHeap(), ESP.getMinFreeHeap());
     Serial.printf("  X-Nonce: %s\n", nonce.c_str());
     Serial.printf("  X-Timestamp: %s\n", timestamp.c_str());
     Serial.printf("  X-Device-UUID: %s\n", myDeviceUUID.c_str());

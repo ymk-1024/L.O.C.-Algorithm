@@ -15,7 +15,7 @@
 #if USE_SSL
   #define BACKEND_BASE_URL "https://loc.mattya3340.com"
 #else
-  #define BACKEND_BASE_URL "https://loc.mattya3340.com"
+  #define BACKEND_BASE_URL "http://loc.mattya3340.com"
 #endif
 
 // ====================
