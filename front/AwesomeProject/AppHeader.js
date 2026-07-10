@@ -17,7 +17,7 @@ export default function AppHeader() {
           style={{ width: 40, height: 40, resizeMode: 'contain', marginRight: 10 }} 
         />
         <Text style={tw`text-[26px] font-bold text-black tracking-tighter`}>
-          LOudy Cushion
+          <Text style={{ color: '#2BB3B6' }}>LO</Text>udy <Text style={{ color: '#2BB3B6' }}>C</Text>ushion
         </Text>
       </View>
     </View>
