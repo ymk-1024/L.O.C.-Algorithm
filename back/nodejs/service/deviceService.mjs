@@ -3,6 +3,34 @@ import ownerTokenService from './ownerTokenService.mjs';
 import sitDataRepository from '../repository/sitDataRepository.mjs';
 import { v7 as uuidV7 } from 'uuid';
 
+const DEFAULT_DEVICE_SETTINGS = {
+  reminder_interval_minutes: 60,
+  daily_stand_goal: 8,
+  sensor_sensitivity: 'Medium'
+};
+
+const normalizeDeviceSettings = (settings) => ({
+  reminder_interval_minutes: Number.isFinite(Number(settings?.reminder_interval_minutes)) && Number(settings.reminder_interval_minutes) > 0
+    ? Number(settings.reminder_interval_minutes)
+    : DEFAULT_DEVICE_SETTINGS.reminder_interval_minutes,
+  daily_stand_goal: Number.isFinite(Number(settings?.daily_stand_goal)) && Number(settings.daily_stand_goal) > 0
+    ? Number(settings.daily_stand_goal)
+    : DEFAULT_DEVICE_SETTINGS.daily_stand_goal,
+  sensor_sensitivity: settings?.sensor_sensitivity || DEFAULT_DEVICE_SETTINGS.sensor_sensitivity
+});
+
+const parseCommandPayload = (payload) => {
+  if (payload == null || typeof payload !== 'string') {
+    return payload;
+  }
+
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return payload;
+  }
+};
+
 const handleSittingStateChange = async (deviceUuid, isSitting) => {
   try {
     const latest = await sitDataRepository.getLatestSitDataByDevice(deviceUuid);
@@ -171,11 +199,7 @@ const deviceService = {
       // 着座状態の管理
       await handleSittingStateChange(deviceUuid, isSitting);
       // ユーザー設定の取得
-      const settings = await userRepo.default.getUserSettings(userUuid) || {
-        reminder_interval_minutes: 60,
-        daily_stand_goal: 8,
-        sensor_sensitivity: 'Medium'
-      };
+      const settings = normalizeDeviceSettings(await userRepo.default.getUserSettings(userUuid));
 
       // 着座時間がリマインダー間隔を超えているかチェックし、必要ならコマンドを発行
       if (isSitting) {
@@ -198,7 +222,10 @@ const deviceService = {
       }
 
       // コマンドの取得
-      const pendingCommands = await repo.default.getPendingCommands(deviceUuid);
+      const pendingCommands = (await repo.default.getPendingCommands(deviceUuid)).map((command) => ({
+        ...command,
+        payload: parseCommandPayload(command.payload),
+      }));
 
       // スケジュールチェックによる間隔制御 (通常10000ms、イベント接近時1000ms等)
       let interval_ms = 10000;
