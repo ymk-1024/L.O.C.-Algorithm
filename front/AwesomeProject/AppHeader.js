@@ -16,14 +16,9 @@ export default function AppHeader() {
           source={require('./assets/logo.png')} 
           style={{ width: 40, height: 40, resizeMode: 'contain', marginRight: 10 }} 
         />
-        <View>
-          <Text style={tw`text-[26px] font-bold text-[#0B2B5A] tracking-tighter`}>
-            LOudy<Text style={tw`text-[#2BB3B6]`}>Cushion</Text>
-          </Text>
-          <Text style={tw`text-[#2BB3B6] text-[10px] font-bold mt-[-2px]`}>
-            座りすぎに、気づきと行動を。
-          </Text>
-        </View>
+        <Text style={tw`text-[26px] font-bold text-black tracking-tighter`}>
+          <Text style={{ color: '#2BB3B6' }}>LO</Text>udy <Text style={{ color: '#2BB3B6' }}>C</Text>ushion
+        </Text>
       </View>
     </View>
   );
